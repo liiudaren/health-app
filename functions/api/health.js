@@ -1,5 +1,19 @@
 export async function onRequest(context) {
   const { request, env } = context;
+
+  // ===== 调试：检查 DB 是否存在 =====
+  if (!env.DB) {
+    return new Response(JSON.stringify({ error: 'DB binding not found' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  // ===== 调试结束 =====
+
+  const url = new URL(request.url);
+  // ... 后面代码保持不变
+export async function onRequest(context) {
+  const { request, env } = context;
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/health/, '') || '/';
   
