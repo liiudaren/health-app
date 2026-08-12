@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5">
+  <title>🌱 个人健康档案 · 云端版</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    /* ===== 完整样式（与你本地版保持一致） ===== */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #f8faff;
+      font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+      padding: 2rem 1rem 3rem;
+      color: #1e2f3f;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(2px);
+      border-radius: 40px;
+      padding: 2rem 2rem 2.5rem;
+      box-shadow: 0 15px 40px rgba(140,170,200,0.15);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+    .gentle-tip {
+      text-align: center;
+      color: #5a7f9e;
+      font-size: 0.95rem;
+      padding: 0.8rem 0 0.2rem;
+      letter-spacing: 0.5px;
+      opacity: 0.8;
+      font-style: italic;
+    }
+    .save-feedback {
+      text-align: center;
+      padding: 0.4rem 0;
+      font-size: 0.9rem;
+      color: #1f6b4a;
+      background: #e6f5e9;
+      border-radius: 40px;
+      margin-bottom: 0.5rem;
+      display: none;
+    }
+    .save-feedback.show { display: block; }
+    h1 { font-weight:400; font-size:2.2rem; display:flex; align-items:center; gap:12px; color:#1f3f5c; flex-wrap:wrap; }
+    h1 i { color:#5f8bb0; font-size:2rem; }
+    .top-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:0.5rem; gap:12px; }
+    .subhead {
+      color: #4d6f8e;
+      border-left: 4px solid #b5d1e6;
+      padding-left: 16px;
+      font-weight: 300;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .subhead-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .countdown-banner {
+      background: linear-gradient(135deg, #e3f0fa, #d1e6f5);
+      border-radius: 60px;
+      padding: 0.5rem 1.8rem;
+      margin: 0.5rem 0 1.2rem 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      border: 1px solid #bed9ef;
+      color: #1d4a6b;
+      font-weight: 450;
+    }
+    .countdown-banner i { font-size:1.3rem; color:#2874a8; }
+    .countdown-banner .days { font-weight:700; font-size:1.2rem; background:white; padding:0.1rem 1rem; border-radius:40px; color:#1a4b70; margin:0 4px; }
+    .countdown-banner .reminder-inline { font-size:0.85rem; color:#b45f1a; margin-left:6px; }
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin:0.5rem 0 1.5rem 0; align-items:center; }
+    .btn {
+      background: white; border: none; padding: 0.6rem 1.6rem; border-radius: 60px;
+      font-weight: 500; font-size: 0.9rem; color: #1e3b5a;
+      box-shadow: 0 2px 8px rgba(0,20,30,0.04); border: 1px solid #d8e5f0;
+      transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      background: #f9fcff;
+    }
+    .btn-primary { background:#1f4a6e; border-color:#1f4a6e; color:white; box-shadow:0 6px 14px rgba(26,67,113,0.18); }
+    .btn-primary i { color:#b3d6f5; }
+    .btn-primary:hover { background:#143a57; transform:scale(0.97); }
+    .btn-outline { background:transparent; border:1px solid #c3d6e9; }
+    .btn-outline:hover { background:#e9f2fa; }
+    .btn-sm { padding:0.25rem 0.9rem; font-size:0.75rem; border-radius:40px; background:#ecf4fd; border:1px solid #d4e3f2; color:#1a405d; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+    .btn-sm:hover { background:#dceaf8; }
+    .btn-danger-sm { background:#fde9e5; border-color:#f5cdc4; color:#a8422e; }
+    .btn-danger-sm:hover { background:#fadbd4; }
+    .btn:disabled { opacity:0.5; cursor:default; transform:none; }
+
+    .privacy-toggle { display:flex; align-items:center; gap:8px; font-size:0.9rem; color:#1f4a6e; background:#eef5fc; padding:0.2rem 1rem 0.2rem 1.2rem; border-radius:40px; border:1px solid #d0e1f0; }
+    .privacy-toggle input { width:40px; height:20px; accent-color:#1f4a6e; cursor:pointer; }
+    .search-box { display:flex; align-items:center; background:white; border-radius:60px; border:1px solid #d8e5f0; padding:0.2rem 0.8rem 0.2rem 1.2rem; }
+    .search-box input { border:none; padding:0.4rem 0.5rem; font-size:0.9rem; width:140px; background:transparent; outline:none; }
+
+    .checkin-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f0f7fe;
+      padding: 0.3rem 1rem;
+      border-radius: 60px;
+      border: 1px solid #d0e1f0;
+      flex-wrap: nowrap;
+    }
+    .checkin-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    .checkin-item .checkin-label { font-weight: 500; color: #2d4d6b; margin-right: 2px; }
+    .checkin-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1f4a6e; cursor: pointer; margin: 0; }
+    .checkin-item input[type="time"] {
+      border: 1px solid #d0dce8; border-radius: 30px; padding: 0.05rem 0.4rem;
+      font-size: 0.7rem; width: 80px; background: white; display: none;
+    }
+    .checkin-item input[type="time"].show { display: inline-block; }
+    .checkin-item .checkin-status { font-weight: 500; color: #1f6b4a; font-size: 0.75rem; margin-left: 2px; }
+
+    .timeline { display:flex; flex-direction:column; gap:1.2rem; margin-top:0.8rem; }
+    .record-card {
+      background: white; border-radius: 28px; padding: 1.2rem 1.6rem;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.02); border: 1px solid #eef4fb;
+      transition: 0.15s; display: flex; flex-direction: column; gap: 6px;
+      position: relative;
+    }
+    .record-card:hover { border-color:#c7ddf2; background:#fcfdff; }
+    .record-card.checkin-card { background: #e6f7ef; border-color: #b8e0cc; }
+    .card-top { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; }
+    .card-left { display:flex; flex-direction:column; gap:4px; flex:2 1 200px; }
+    .card-left .date { font-weight:500; color:#1f4a6e; font-size:1.1rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .card-left .hospital-doctor { color:#2f4f6f; font-size:0.95rem; display:flex; gap:18px; flex-wrap:wrap; }
+    .card-left .hospital-doctor span i { margin-right:4px; color:#6a8fb0; width:18px; }
+    .tag-warning { background:#ffe8e0; color:#b3402a; font-size:0.7rem; font-weight:600; padding:0.15rem 0.9rem; border-radius:30px; border:1px solid #fad3c4; display:inline-flex; align-items:center; gap:4px; }
+    .empty-message { text-align:center; padding:3rem 0; color:#7b9bb9; font-style:italic; }
+    .card-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px; }
+    .card-footer { font-size:0.8rem; color:#4d6f8e; border-top:1px solid #eef4fb; padding-top:8px; margin-top:4px; display:flex; flex-wrap:wrap; gap:12px; }
+    .cost-summary { font-size:0.8rem; color:#1f4a6e; background:#f0f7fe; padding:0.05rem 1rem; border-radius:30px; display:inline-block; }
+
+    /* 用药分区 */
+    .med-section { margin-top:4px; }
+    .med-section .med-label { font-weight:500; color:#4d6f8e; font-size:0.8rem; }
+    .med-section .med-tags { display:flex; flex-wrap:wrap; gap:4px 8px; margin-top:2px; }
+    .med-section .med-tag { padding:0.05rem 0.8rem; border-radius:30px; font-size:0.8rem; border:1px solid #d0e2f2; }
+    .med-section .med-tag.continued { background:#e6f5e9; border-color:#b8dcc4; color:#1a5a3a; }
+    .med-section .med-tag.discontinued-tag { background:#f5e6e0; border-color:#e0c8c0; color:#8a4a3a; }
+    .med-section .med-tag.new-tag { background:#e0effa; border-color:#b8d0e0; color:#1a5a7a; }
+    .med-section .med-tag.temp-tag { background:#f0f7fe; border-color:#c8dce8; color:#2a5a7a; }
+
+    /* Modal */
+    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(30,50,70,0.3); backdrop-filter:blur(3px); justify-content:center; align-items:center; z-index:1000; padding:1.5rem; }
+    .modal-overlay.active { display:flex; }
+    .modal-card { background:white; max-width:850px; width:100%; border-radius:36px; padding:2rem; max-height:95vh; overflow-y:auto; border:1px solid rgba(255,255,255,0.5); }
+    .modal-card h2 { font-weight:400; font-size:1.8rem; color:#1b3a57; border-bottom:2px solid #e3eefa; padding-bottom:0.8rem; margin-bottom:1.6rem; display:flex; align-items:center; gap:12px; }
+    .form-group { margin-bottom:1.2rem; }
+    .form-group label { display:block; font-weight:500; font-size:0.85rem; color:#2d4d6b; margin-bottom:4px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width:100%; padding:0.7rem 1rem; border-radius:30px; border:1px solid #d6e3f0; background:#fbfdff; font-size:0.95rem; font-family:inherit;
+    }
+    .form-group textarea { border-radius:24px; resize:vertical; min-height:60px; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#2d6b97; outline:none; background:white; box-shadow:0 0 0 4px rgba(40,100,160,0.08); }
+    .medication-group { border:1px solid #e2eefa; border-radius:28px; padding:1rem 1.2rem; background:#fafdff; }
+    .med-row {
+      display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px;
+      background:#f5faff; padding:6px 12px; border-radius:40px; border:1px solid #ddebf5;
+    }
+    .med-row .med-field { flex:1 1 70px; min-width:55px; }
+    .med-row .med-field input { width:100%; padding:0.3rem 0.6rem; border-radius:30px; border:1px solid #d6e3f0; background:white; font-size:0.85rem; }
+    .med-row .med-check { display:flex; align-items:center; gap:4px; font-size:0.75rem; white-space:nowrap; }
+    .med-row .med-check input { width:16px; height:16px; accent-color:#1f4a6e; cursor:pointer; }
+    .med-row .med-status select { padding:0.2rem 0.4rem; border-radius:30px; border:1px solid #d6e3f0; font-size:0.75rem; background:white; }
+    .med-row .btn-remove-med { background:none; border:none; color:#b35f4a; font-size:1.2rem; cursor:pointer; padding:0 4px; }
+    .btn-add-med { margin-top:4px; background:#e6f0fa; border:1px dashed #8fb4d0; border-radius:40px; padding:0.2rem 1.2rem; font-size:0.8rem; color:#1f4a6e; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .upload-area { border:2px dashed #c4d9ed; border-radius:30px; padding:1.4rem 1rem; text-align:center; background:#f8fcff; transition:0.2s; cursor:pointer; color:#4f7a9b; }
+    .upload-area.dragover { background:#e3f0fd; border-color:#1f6b9e; }
+    .upload-area i { font-size:1.8rem; color:#6f9bc0; display:block; margin-bottom:4px; }
+    .upload-area span { font-size:0.9rem; }
+    .file-preview { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .file-preview .preview-item { background:#eef5fb; border-radius:30px; padding:0.2rem 1rem 0.2rem 0.8rem; display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; border:1px solid #cee0ef; }
+    .file-preview .preview-item i.fa-times-circle { color:#b3442a; cursor:pointer; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:12px; margin-top:1.8rem; flex-wrap:wrap; }
+    .symptom-box { display:none; margin-top:6px; }
+    .symptom-box.visible { display:block; }
+    .cost-row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .cost-row .cost-field { flex:1 1 80px; min-width:70px; }
+    .cost-row .cost-field input { width:100%; padding:0.5rem 0.8rem; border-radius:30px; border:1px solid #d6e3f0; }
+    .cost-total { font-weight:600; color:#1f4a6e; margin-top:6px; }
+
+    .schedule-checkboxes { display:flex; flex-wrap:wrap; gap:4px 12px; margin-bottom:6px; }
+    .schedule-checkboxes label { display:flex; align-items:center; gap:3px; font-size:0.85rem; cursor:pointer; }
+
+    .viewer-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(8px); justify-content:center; align-items:center; z-index:2000; padding:1.5rem; }
+    .viewer-overlay.active { display:flex; }
+    .viewer-card { background:#fbfdff; max-width:780px; width:100%; border-radius:44px; padding:1.6rem; box-shadow:0 40px 80px rgba(0,0,0,0.3); max-height:90vh; display:flex; flex-direction:column; }
+    .viewer-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; }
+    .viewer-close { background:none; border:none; font-size:1.8rem; cursor:pointer; color:#4f7394; }
+    .viewer-close:hover { color:#b3402a; }
+    .viewer-slider { position:relative; display:flex; align-items:center; justify-content:center; background:#eef4fa; border-radius:36px; min-height:280px; overflow:hidden; margin:0.2rem 0; flex:1; }
+    .viewer-slider .image-wrapper { position:relative; display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
+    .viewer-slider .image-wrapper img { max-width:100%; max-height:460px; object-fit:contain; border-radius:20px; background:white; display:block; transition: transform 0.2s; }
+    .viewer-slider .image-wrapper .privacy-blur { display:none; position:absolute; top:0; left:0; width:100%; height:100%; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-radius:20px; background:rgba(255,255,255,0.1); pointer-events:none; }
+    .privacy-on .viewer-slider .image-wrapper .privacy-blur { display:block; }
+    .slider-btn { background:white; border:none; border-radius:60px; width:44px; height:44px; font-size:1.3rem; color:#1f4a6e; box-shadow:0 4px 12px rgba(0,0,0,0.08); cursor:pointer; display:flex; align-items:center; justify-content:center; position:absolute; top:50%; transform:translateY(-50%); border:1px solid rgba(255,255,255,0.4); z-index:10; }
+    .slider-btn:hover { background:#f0f7ff; }
+    .slider-btn.prev { left:12px; }
+    .slider-btn.next { right:12px; }
+    .viewer-controls { display:flex; justify-content:center; gap:16px; padding:10px 0 4px; }
+    .viewer-controls button { background:#ecf4fd; border:1px solid #c7d9ec; border-radius:40px; padding:0.3rem 1.2rem; font-size:0.8rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .viewer-controls button:hover { background:#dceaf8; }
+    .viewer-indicator { text-align:center; margin-top:6px; color:#2a577b; font-size:0.85rem; }
+
+    .metrics-section { margin-top: 2.5rem; border-top: 2px solid #e3eefa; padding-top: 1.2rem; }
+    .metrics-toggle { background:none; border:none; font-size:1.2rem; font-weight:500; color:#1f4a6e; cursor:pointer; display:flex; align-items:center; gap:12px; padding:0.2rem 0; }
+    .metrics-toggle i { transition:transform 0.2s; }
+    .metrics-panel { display:none; padding:1rem 0; }
+    .metrics-panel.open { display:block; }
+    .metrics-toolbar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:1rem; align-items:center; }
+    .metrics-table { width:100%; border-collapse:collapse; font-size:0.9rem; }
+    .metrics-table th { text-align:left; padding:0.6rem 0.5rem; background:#f2f8ff; color:#1f3b5a; border-bottom:2px solid #d6e2f0; }
+    .metrics-table td { padding:0.6rem 0.5rem; border-bottom:1px solid #eaf0f8; }
+    .metrics-table tr:hover td { background:#f8fbfe; }
+    .metrics-table .empty-row td { text-align:center; color:#8aa2c0; padding:1.5rem 0; }
+    .base-info-box { background:#f2f8ff; border-radius:20px; padding:0.8rem 1.5rem; margin-bottom:1rem; display:flex; flex-wrap:wrap; align-items:center; gap:16px; border:1px solid #d6e2f0; }
+
+    .med-history-section { margin-top: 1.5rem; border-top: 2px solid #e3eefa; padding-top: 1.2rem; }
+    .med-history-toggle { background:none; border:none; font-size:1.2rem; font-weight:500; color:#1f4a6e; cursor:pointer; display:flex; align-items:center; gap:12px; padding:0.2rem 0; }
+    .med-history-toggle i { transition:transform 0.2s; }
+    .med-history-panel { display:none; padding:1rem 0; }
+    .med-history-panel.open { display:block; }
+    .med-history-card { background:#f8fcff; border-radius:20px; padding:0.8rem 1.2rem; margin-bottom:0.8rem; border:1px solid #e0eaf3; }
+    .med-history-card .med-name { font-weight:600; color:#1f4a6e; }
+    .med-history-card .med-timeline { font-size:0.85rem; color:#2f4f6f; }
+
+    .privacy-hidden .private-field { display: none !important; }
+    .backup-section { margin-top: 2rem; border-top: 2px solid #e3eefa; padding-top: 1.2rem; display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+
+    .med-name-wrapper { position:relative; }
+    .med-name-suggestions {
+      position:absolute; top:100%; left:0; width:100%; max-height:120px; overflow-y:auto;
+      background:white; border:1px solid #d6e3f0; border-radius:16px; z-index:50;
+      display:none; box-shadow:0 8px 20px rgba(0,0,0,0.08);
+    }
+    .med-name-suggestions.show { display:block; }
+    .med-name-suggestions .sug-item { padding:0.3rem 1rem; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f0f4fa; }
+    .med-name-suggestions .sug-item:hover { background:#e9f2fa; }
+
+    @media (max-width: 640px) {
+      .container { padding:1.2rem; }
+      .record-card { flex-direction:column; align-items:stretch; }
+      .modal-card { padding:1.5rem; }
+      .med-row { flex-direction:column; align-items:stretch; }
+      .search-box input { width:100px; }
+      .checkin-area { flex-wrap:wrap; padding:0.2rem 0.6rem; }
+      .checkin-item { font-size:0.7rem; }
+      .cost-row { flex-direction:column; }
+      .subhead-right { flex-wrap:wrap; }
+      .schedule-checkboxes { gap:2px 8px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="appContainer">
+  <div class="top-bar">
+    <h1><i class="fas fa-heartbeat"></i> 健康档案</h1>
+    <div class="privacy-toggle">
+      <i class="fas fa-lock"></i> 隐私模式
+      <input type="checkbox" id="privacyToggle">
+    </div>
+  </div>
+
+  <div class="subhead">
+    <span><i class="far fa-calendar-alt"></i> 记录你的每一刻</span>
+    <span class="subhead-right">
+      <span id="recordCount">0 条记录</span>
+      <span class="search-box"><i class="fas fa-search"></i><input type="text" id="searchInput" placeholder="搜索..."></span>
+      <span class="checkin-area" id="checkinArea">
+        <span class="checkin-item" id="checkinMorning">
+          <span class="checkin-label">☀️ 早上</span>
+          <input type="checkbox" class="checkin-checkbox" data-period="morning">
+          <input type="time" class="checkin-time-input" data-period="morning">
+          <span class="checkin-status" data-period="morning"></span>
+        </span>
+        <span class="checkin-item" id="checkinAfternoon">
+          <span class="checkin-label">🌤 下午</span>
+          <input type="checkbox" class="checkin-checkbox" data-period="afternoon">
+          <input type="time" class="checkin-time-input" data-period="afternoon">
+          <span class="checkin-status" data-period="afternoon"></span>
+        </span>
+        <span class="checkin-item" id="checkinEvening">
+          <span class="checkin-label">🌙 晚上</span>
+          <input type="checkbox" class="checkin-checkbox" data-period="evening">
+          <input type="time" class="checkin-time-input" data-period="evening">
+          <span class="checkin-status" data-period="evening"></span>
+        </span>
+      </span>
+    </span>
+  </div>
+
+  <div class="countdown-banner">
+    <i class="fas fa-clock"></i>
+    <span>距离下次复查还有</span>
+    <span class="days" id="countdownDays">--</span>
+    <span>天</span>
+    <span style="margin-left:auto; font-size:0.8rem; opacity:0.8;" id="nextVisitDate"></span>
+    <span class="reminder-inline" id="referralReminderInline" style="display:none;">（提醒：如需转诊请提前办理）</span>
+  </div>
+
+  <div class="save-feedback" id="saveFeedback"></div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" id="openModalBtn"><i class="fas fa-plus-circle"></i> 添加就诊记录</button>
+    <button class="btn btn-outline" id="exportReportBtn"><i class="fas fa-file-pdf"></i> 📄 导出报告</button>
+    <button class="btn btn-outline" id="clearAllBtn"><i class="fas fa-trash-alt"></i> 清除所有数据</button>
+  </div>
+
+  <div class="timeline" id="timelineContainer"></div>
+
+  <div class="metrics-section">
+    <button class="metrics-toggle" id="metricsToggle"><i class="fas fa-chevron-down"></i> 📊 身体指标记录</button>
+    <div class="metrics-panel" id="metricsPanel">
+      <div class="base-info-box">
+        <span><i class="fas fa-user-circle"></i> 基础信息</span>
+        <label>身高 (cm)：<input type="text" id="baseHeight" style="width:80px;padding:0.2rem 0.6rem;border-radius:30px;border:1px solid #d6e3f0;"></label>
+        <button class="btn btn-sm" id="saveBaseHeightBtn">保存身高</button>
+        <span style="font-size:0.8rem;color:#6a8fb0;" id="baseHeightStatus"></span>
+      </div>
+      <div class="metrics-toolbar">
+        <button class="btn btn-primary" id="addMetricBtn"><i class="fas fa-plus"></i> 添加记录</button>
+        <button class="btn btn-outline" id="clearMetricsBtn"><i class="fas fa-trash-alt"></i> 清除所有指标</button>
+      </div>
+      <table class="metrics-table" id="metricsTable">
+        <thead><tr><th>日期</th><th>指标名称</th><th>数值</th><th>单位</th><th>BMI</th><th>备注</th><th>操作</th></tr></thead>
+        <tbody id="metricsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="med-history-section">
+    <button class="med-history-toggle" id="medHistoryToggle"><i class="fas fa-chevron-down"></i> 💊 用药历史</button>
+    <div class="med-history-panel" id="medHistoryPanel">
+      <div id="medHistoryContent"><p style="color:#7b9bb9;">暂无用药记录</p></div>
+    </div>
+  </div>
+
+  <div class="backup-section">
+    <button class="btn btn-outline" id="exportDataBtn"><i class="fas fa-file-export"></i> 导出数据 (JSON)</button>
+    <button class="btn btn-outline" id="importDataBtn"><i class="fas fa-file-import"></i> 导入数据 (JSON)</button>
+    <button class="btn btn-danger-sm" id="resetAllBtn" style="background:#fde9e5;border-color:#f5cdc4;color:#a8422e;"><i class="fas fa-trash-alt"></i> 🗑️ 清空所有数据（重置）</button>
+    <input type="file" id="importFileInput" accept=".json" style="display:none;">
+    <span style="font-size:0.8rem;color:#6a8fb0;">备份所有就诊记录、指标、打卡数据</span>
+  </div>
+
+  <div class="gentle-tip">每一次记录，都是对自己负责 💛</div>
+</div>
+
+<!-- 就诊记录 Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-card">
+    <h2 id="modalTitle"><i class="fas fa-notes-medical"></i> 新就诊记录</h2>
+    <form id="recordForm">
+      <input type="hidden" id="editRecordId" value="">
+      <div class="form-group"><label>📅 就诊日期</label><input type="date" id="visitDate" required></div>
+      <div class="form-group"><label>🏥 医院名</label><input type="text" id="hospitalName" placeholder="如：市第一人民医院" required></div>
+      <div class="form-group"><label>👨‍⚕️ 医生名</label><input type="text" id="doctorName" placeholder="如：张敏" required></div>
+      
+      <div class="form-group">
+        <label>🕐 医生固定出诊时间</label>
+        <div class="schedule-checkboxes" id="scheduleCheckboxes">
+          <label><input type="checkbox" value="星期一"> 周一</label>
+          <label><input type="checkbox" value="星期二"> 周二</label>
+          <label><input type="checkbox" value="星期三"> 周三</label>
+          <label><input type="checkbox" value="星期四"> 周四</label>
+          <label><input type="checkbox" value="星期五"> 周五</label>
+          <label><input type="checkbox" value="星期六"> 周六</label>
+          <label><input type="checkbox" value="星期日"> 周日</label>
+        </div>
+        <select id="schedulePeriod">
+          <option value="上午">上午</option>
+          <option value="下午">下午</option>
+          <option value="全天">全天</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>🔍 检查目的</label>
+        <select id="examPurpose"><option value="常规复查">常规复查</option><option value="针对性检查">针对性检查</option><option value="年度体检">年度体检</option><option value="随访">随访</option></select>
+      </div>
+      <div class="form-group symptom-box" id="symptomGroup"><label>📋 具体症状 / 检查原因</label><textarea id="symptomReason" placeholder="请描述具体症状或检查原因..."></textarea></div>
+      <div class="form-group"><label>⚖️ 体重 (kg) 可选</label><input type="text" id="recordWeight" placeholder="如: 72.5"></div>
+      <div class="form-group"><label>📊 其他指标数值 (可选)</label><input type="text" id="metricValue" placeholder="如: 空腹血糖 5.6"></div>
+
+      <div class="form-group">
+        <label>💰 费用清单</label>
+        <div class="cost-row">
+          <div class="cost-field"><label style="font-size:0.75rem;color:#4d6f8e;">挂号费 (元)</label><input type="number" id="costRegistration" min="0" step="0.01" value="0"></div>
+          <div class="cost-field"><label style="font-size:0.75rem;color:#4d6f8e;">检查费 (元)</label><input type="number" id="costExam" min="0" step="0.01" value="0"></div>
+          <div class="cost-field"><label style="font-size:0.75rem;color:#4d6f8e;">药费 (元)</label><input type="number" id="costDrug" min="0" step="0.01" value="0"></div>
+          <div class="cost-field"><label style="font-size:0.75rem;color:#4d6f8e;">交通费 (元)</label><input type="number" id="costTransport" min="0" step="0.01" value="0"></div>
+        </div>
+        <div class="cost-total">💰 合计：<span id="costTotalDisplay">0.00</span> 元</div>
+      </div>
+
+      <div class="form-group">
+        <label>💊 用药情况（无数量限制，点击下方按钮可继续添加）</label>
+        <div class="medication-group" id="medicationGroup">
+          <div class="med-row" data-index="0">
+            <div class="med-field" style="flex:2 1 120px; position:relative;">
+              <div class="med-name-wrapper">
+                <input type="text" class="med-name" placeholder="药名" autocomplete="off">
+                <div class="med-name-suggestions"></div>
+              </div>
+            </div>
+            <div class="med-field"><input type="text" class="med-spec" placeholder="规格"></div>
+            <div class="med-field"><input type="text" class="med-usage" placeholder="用法"></div>
+            <div class="med-check"><label><input type="checkbox" class="med-self"> 自备</label></div>
+            <div class="med-check"><label><input type="checkbox" class="med-longterm"> 长期</label></div>
+            <div class="med-status">
+              <select class="med-status-select">
+                <option value="服用中">✅ 服用中</option>
+                <option value="已停用">❌ 已停用</option>
+                <option value="临时用药">📋 临时用药</option>
+              </select>
+            </div>
+            <button type="button" class="btn-remove-med" style="visibility:hidden;">&times;</button>
+          </div>
+        </div>
+        <button type="button" class="btn-add-med" id="addMedBtn"><i class="fas fa-plus-circle"></i> 添加另一种药（无上限）</button>
+        <div style="font-size:0.75rem;color:#6a8fb0;margin-top:4px;">💡 点击一次新增一组，可添加任意数量</div>
+      </div>
+
+      <div class="form-group"><label>📝 本次感想</label><textarea id="feelings" placeholder="记录你的感受..."></textarea></div>
+      <div class="form-group"><label>📅 下次复查日期</label><input type="date" id="nextVisitDateInput"></div>
+      <div class="form-group">
+        <label>🖼️ 检查单图片 / PDF</label>
+        <div class="upload-area" id="dropArea"><i class="fas fa-cloud-upload-alt"></i><span>点击上传 或 拖拽图片/PDF</span><input type="file" id="fileInput" accept="image/jpeg,image/png,application/pdf" multiple style="display:none"></div>
+        <div class="file-preview" id="filePreviewContainer"></div>
+        <small style="color:#6f8daa;">支持 JPG/PNG/PDF，PDF将自动渲染为图片</small>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="cancelModalBtn">取消</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存记录</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 身体指标 Modal -->
+<div class="modal-overlay" id="metricModalOverlay">
+  <div class="modal-card" style="max-width:500px;">
+    <h2><i class="fas fa-weight"></i> 添加身体指标</h2>
+    <form id="metricForm">
+      <div class="form-group"><label>📅 日期</label><input type="date" id="metricDate" required></div>
+      <div class="form-group">
+        <label>📊 指标名称</label>
+        <input type="text" id="metricName" list="metricNameOptions" placeholder="输入或选择指标" required>
+        <datalist id="metricNameOptions">
+          <option value="体重"><option value="血压"><option value="心率"><option value="体温">
+        </datalist>
+      </div>
+      <div class="form-group"><label>🔢 数值</label><input type="text" id="metricValueInput" placeholder="如: 72.5" required></div>
+      <div class="form-group"><label>📏 单位 (选填)</label><input type="text" id="metricUnit" placeholder="如: kg, mmHg, °C"></div>
+      <div class="form-group"><label>📝 备注 (选填)</label><input type="text" id="metricNote" placeholder="可选"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="cancelMetricBtn">取消</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 图片查看器 -->
+<div class="viewer-overlay" id="viewerOverlay">
+  <div class="viewer-card">
+    <div class="viewer-header"><span><i class="far fa-images"></i> 检查单图片</span><button class="viewer-close" id="viewerCloseBtn">&times;</button></div>
+    <div class="viewer-slider" id="viewerSlider">
+      <button class="slider-btn prev" id="viewerPrev"><i class="fas fa-chevron-left"></i></button>
+      <div class="image-wrapper">
+        <img id="viewerImage" src="" alt="检查单图片" style="transform: scale(1) rotate(0deg);">
+        <div class="privacy-blur" id="privacyBlurLayer"></div>
+      </div>
+      <button class="slider-btn next" id="viewerNext"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    <div class="viewer-controls">
+      <button id="viewerZoomIn"><i class="fas fa-search-plus"></i> 放大</button>
+      <button id="viewerZoomOut"><i class="fas fa-search-minus"></i> 缩小</button>
+      <button id="viewerRotate"><i class="fas fa-sync-alt"></i> 旋转</button>
+    </div>
+    <div class="viewer-indicator" id="viewerIndicator">1 / 1</div>
+  </div>
+</div>
+
+<!-- 导出报告预览 -->
+<div class="modal-overlay" id="reportModalOverlay">
+  <div class="modal-card" style="max-width:900px;">
+    <h2><i class="fas fa-file-pdf"></i> 健康报告预览</h2>
+    <div id="reportContent" style="max-height:60vh; overflow-y:auto; padding:0.5rem 0; font-size:0.9rem;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="closeReportBtn">关闭</button>
+      <button class="btn btn-primary" id="printReportBtn"><i class="fas fa-print"></i> 打印 / 保存为PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ===== 云端 API 基础 URL =====
+    const API_BASE = '/api/health';
+
+    // ===== 通用函数 =====
+    async function apiRequest(method, path, body) {
+      const url = API_BASE + path;
+      const options = {
+        method: method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (body) options.body = JSON.stringify(body);
+      try {
+        const res = await fetch(url, options);
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err || '请求失败');
+        }
+        return await res.json();
+      } catch (e) {
+        console.error('API请求失败:', e);
+        throw e;
+      }
+    }
+
+    // ===== 存储键（仅用于本地缓存/备份，非主要存储） =====
+    const STORAGE_KEY = 'healthRecords_v1';
+    const PRIVACY_KEY = 'privacyMode_v1';
+    const METRICS_KEY = 'bodyMetrics_v2';
+    const CHECKIN_KEY = 'checkinData_v2';
+    const BASE_HEIGHT_KEY = 'baseHeight_v1';
+    const DRAFT_KEY = 'recordDraft_v1';
+
+    // ===== 通用 =====
+    function loadRecords() { 
+      // 优先从云端加载，这里仅作为本地缓存读取
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(e){ return []; } 
+    }
+    function saveRecordsLocal(r) { localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
+    function loadPrivacy() { return localStorage.getItem(PRIVACY_KEY) === 'true'; }
+    function savePrivacy(v) { localStorage.setItem(PRIVACY_KEY, String(v)); }
+    function loadMetrics() { try { return JSON.parse(localStorage.getItem(METRICS_KEY)) || []; } catch(e){ return []; } }
+    function saveMetrics(m) { localStorage.setItem(METRICS_KEY, JSON.stringify(m)); }
+    function getBaseHeight() { return parseFloat(localStorage.getItem(BASE_HEIGHT_KEY)) || null; }
+    function setBaseHeight(h) { localStorage.setItem(BASE_HEIGHT_KEY, String(h)); }
+    function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || null; } catch(e){ return null; } }
+    function saveDraft(d) { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }
+    function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
+
+    // ===== 打卡 =====
+    function getCheckinData() {
+      try { return JSON.parse(localStorage.getItem(CHECKIN_KEY)) || { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; } 
+      catch(e){ return { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; }
+    }
+    function saveCheckinData(d) { localStorage.setItem(CHECKIN_KEY, JSON.stringify(d)); }
+
+    function resetCheckinIfNewDay() {
+      const today = new Date().toISOString().slice(0,10);
+      const data = getCheckinData();
+      if (data.date !== today) {
+        data.date = today;
+        data.morning = { checked: false, time: '' };
+        data.afternoon = { checked: false, time: '' };
+        data.evening = { checked: false, time: '' };
+        saveCheckinData(data);
+      }
+      return data;
+    }
+
+    function updateCheckinUI() {
+      const data = resetCheckinIfNewDay();
+      ['morning', 'afternoon', 'evening'].forEach(p => {
+        const checkbox = document.querySelector(`.checkin-checkbox[data-period="${p}"]`);
+        const timeInput = document.querySelector(`.checkin-time-input[data-period="${p}"]`);
+        const statusEl = document.querySelector(`.checkin-status[data-period="${p}"]`);
+        if (checkbox && timeInput && statusEl) {
+          const info = data[p];
+          checkbox.checked = info.checked;
+          if (info.checked && info.time) {
+            timeInput.value = info.time;
+            timeInput.classList.add('show');
+            statusEl.textContent = '✅ ' + info.time;
+          } else {
+            timeInput.value = '';
+            timeInput.classList.remove('show');
+            statusEl.textContent = '';
+          }
+        }
+      });
+    }
+
+    function setupCheckinEvents() {
+      document.querySelectorAll('.checkin-checkbox').forEach(cb => {
+        cb.addEventListener('change', function(e) {
+          const period = this.dataset.period;
+          const data = getCheckinData();
+          const today = new Date().toISOString().slice(0,10);
+          if (data.date !== today) {
+            data.date = today;
+            data.morning = { checked: false, time: '' };
+            data.afternoon = { checked: false, time: '' };
+            data.evening = { checked: false, time: '' };
+          }
+          const timeInput = document.querySelector(`.checkin-time-input[data-period="${period}"]`);
+          const statusEl = document.querySelector(`.checkin-status[data-period="${period}"]`);
+          if (this.checked) {
+            const now = new Date();
+            const defaultTime = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+            timeInput.value = defaultTime;
+            timeInput.classList.add('show');
+            data[period] = { checked: true, time: defaultTime };
+            statusEl.textContent = '✅ ' + defaultTime;
+          } else {
+            timeInput.value = '';
+            timeInput.classList.remove('show');
+            data[period] = { checked: false, time: '' };
+            statusEl.textContent = '';
+          }
+          saveCheckinData(data);
+          renderTimeline();
+        });
+      });
+
+      document.querySelectorAll('.checkin-time-input').forEach(input => {
+        input.addEventListener('change', function() {
+          const period = this.dataset.period;
+          const data = getCheckinData();
+          const today = new Date().toISOString().slice(0,10);
+          if (data.date !== today) {
+            data.date = today;
+            data.morning = { checked: false, time: '' };
+            data.afternoon = { checked: false, time: '' };
+            data.evening = { checked: false, time: '' };
+          }
+          const checkbox = document.querySelector(`.checkin-checkbox[data-period="${period}"]`);
+          const statusEl = document.querySelector(`.checkin-status[data-period="${period}"]`);
+          if (checkbox && checkbox.checked) {
+            data[period].time = this.value;
+            statusEl.textContent = '✅ ' + this.value;
+            saveCheckinData(data);
+          }
+        });
+      });
+    }
+
+    // ===== 身体指标 =====
+    function renderMetrics() {
+      const metrics = loadMetrics();
+      const baseHeight = getBaseHeight();
+      const sorted = [...metrics].sort((a,b) => a.date < b.date ? 1 : -1);
+      const tbody = document.getElementById('metricsBody');
+      if (sorted.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="7">暂无指标记录，点击"添加记录"开始</td></tr>`;
+        return;
+      }
+      let html = '';
+      sorted.forEach((m, idx) => {
+        let bmi = '';
+        if (m.name === '体重' && baseHeight && m.value) {
+          const w = parseFloat(m.value);
+          if (!isNaN(w)) {
+            const h = baseHeight / 100;
+            bmi = (w / (h*h)).toFixed(1);
+          }
+        }
+        html += `<tr>
+          <td>${m.date}</td>
+          <td>${m.name || '-'}</td>
+          <td>${m.value || '-'}</td>
+          <td>${m.unit || ''}</td>
+          <td>${bmi || ''}</td>
+          <td>${m.note || ''}</td>
+          <td><button class="btn-sm btn-danger-sm delete-metric-btn" data-idx="${idx}"><i class="fas fa-trash-alt"></i></button></td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+      document.querySelectorAll('.delete-metric-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const idx = parseInt(this.dataset.idx);
+          if (confirm('删除这条指标记录？')) {
+            let metrics = loadMetrics();
+            metrics.splice(idx, 1);
+            saveMetrics(metrics);
+            renderMetrics();
+          }
+        });
+      });
+      document.getElementById('baseHeightStatus').textContent = baseHeight ? `当前身高: ${baseHeight} cm` : '未设置';
+      document.getElementById('baseHeight').value = baseHeight || '';
+    }
+
+    document.getElementById('saveBaseHeightBtn').addEventListener('click', function() {
+      const val = parseFloat(document.getElementById('baseHeight').value);
+      if (!isNaN(val) && val > 0) {
+        setBaseHeight(val);
+        renderMetrics();
+      } else { alert('请输入有效身高 (cm)'); }
+    });
+
+    const metricModalOverlay = document.getElementById('metricModalOverlay');
+    document.getElementById('addMetricBtn').addEventListener('click', ()=>{
+      document.getElementById('metricDate').value = new Date().toISOString().slice(0,10);
+      document.getElementById('metricName').value = '';
+      document.getElementById('metricValueInput').value = '';
+      document.getElementById('metricUnit').value = '';
+      document.getElementById('metricNote').value = '';
+      metricModalOverlay.classList.add('active');
+    });
+    document.getElementById('cancelMetricBtn').addEventListener('click', ()=>metricModalOverlay.classList.remove('active'));
+    metricModalOverlay.addEventListener('click', e=>{ if(e.target===metricModalOverlay) metricModalOverlay.classList.remove('active'); });
+    document.getElementById('metricForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const date = document.getElementById('metricDate').value;
+      const name = document.getElementById('metricName').value.trim();
+      const value = document.getElementById('metricValueInput').value.trim();
+      const unit = document.getElementById('metricUnit').value.trim();
+      const note = document.getElementById('metricNote').value.trim();
+      if (!date || !name || !value) { alert('请完整填写日期、指标名称和数值'); return; }
+      const metrics = loadMetrics();
+      metrics.push({ date, name, value, unit, note });
+      saveMetrics(metrics);
+      renderMetrics();
+      metricModalOverlay.classList.remove('active');
+    });
+
+    document.getElementById('clearMetricsBtn').addEventListener('click', ()=>{
+      if (confirm('删除所有身体指标记录？')) {
+        saveMetrics([]);
+        renderMetrics();
+      }
+    });
+
+    // ===== 用药历史 =====
+    function renderMedHistory() {
+      const records = loadRecords();
+      if (records.length === 0) {
+        document.getElementById('medHistoryContent').innerHTML = '<p style="color:#7b9bb9;">暂无用药记录</p>';
+        return;
+      }
+      const medMap = {};
+      records.forEach(r => {
+        if (r.medications && r.medications.length) {
+          r.medications.forEach(m => {
+            const key = m.name || '未知药品';
+            if (!medMap[key]) medMap[key] = [];
+            medMap[key].push({ date: r.date, med: m });
+          });
+        }
+      });
+      let html = '';
+      for (const [name, entries] of Object.entries(medMap)) {
+        const sorted = entries.sort((a,b) => a.date.localeCompare(b.date));
+        const first = sorted[0].date;
+        const last = sorted[sorted.length-1].date;
+        const changes = sorted.map(e => `${e.date}: ${e.med.spec||''} ${e.med.usage||''} (${e.med.status||'服用中'})`).join(' → ');
+        html += `<div class="med-history-card">
+          <div class="med-name">💊 ${name}</div>
+          <div class="med-timeline">📅 ${first} → ${last} &nbsp;|&nbsp; 变化: ${changes}</div>
+        </div>`;
+      }
+      document.getElementById('medHistoryContent').innerHTML = html || '<p style="color:#7b9bb9;">暂无用药记录</p>';
+    }
+
+    document.getElementById('medHistoryToggle').addEventListener('click', function(){
+      const panel = document.getElementById('medHistoryPanel');
+      panel.classList.toggle('open');
+      this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
+      if (panel.classList.contains('open')) renderMedHistory();
+    });
+
+    // ===== 核心渲染 =====
+    function compressImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w=img.width, h=img.height;
+            const maxW=1200;
+            if(w>maxW){ h=(h*maxW)/w; w=maxW; }
+            canvas.width=w; canvas.height=h;
+            const ctx=canvas.getContext('2d');
+            ctx.drawImage(img,0,0,w,h);
+            resolve(canvas.toDataURL('image/jpeg',0.8));
+          };
+        };
+      });
+    }
+
+    function getHistoricalDrugNames() {
+      const records = loadRecords();
+      const names = new Set();
+      records.forEach(r => {
+        if (r.medications) {
+          r.medications.forEach(m => { if (m.name) names.add(m.name); });
+        }
+      });
+      return Array.from(names).sort();
+    }
+
+    function getDrugHistory(name) {
+      const records = loadRecords();
+      const sorted = [...records].sort((a,b) => new Date(b.date) - new Date(a.date));
+      for (let r of sorted) {
+        if (r.medications) {
+          for (let m of r.medications) {
+            if (m.name === name) {
+              return { spec: m.spec || '', usage: m.usage || '', longTerm: !!m.longTerm };
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    function getPrevRecord(records, id) {
+      const sorted=[...records].sort((a,b)=> new Date(b.date) - new Date(a.date));
+      const idx=sorted.findIndex(r=>r.id===id);
+      if(idx===-1 || idx===sorted.length-1) return null;
+      return sorted[idx+1];
+    }
+
+    function formatMedShort(m) {
+      let parts = [m.name || ''];
+      if (m.spec) parts.push(m.spec);
+      if (m.usage) parts.push(m.usage);
+      let label = parts.filter(p=>p).join(' · ');
+      if (m.selfSupplied) label += ' · 自备';
+      if (m.longTerm) label += ' · 长期';
+      return label;
+    }
+
+    // ===== 新卡片用药显示逻辑 =====
+    function buildMedicationDisplay(currMeds) {
+      if (!currMeds || currMeds.length === 0) {
+        return '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
+      }
+
+      const taking = currMeds.filter(m => m.status === '服用中' || !m.status);
+      const stopped = currMeds.filter(m => m.status === '已停用');
+      const temp = currMeds.filter(m => m.status === '临时用药');
+
+      let html = '';
+
+      if (taking.length > 0) {
+        html += `<div class="med-section">`;
+        html += `<div class="med-label">💊 长期用药</div><div class="med-tags">`;
+        taking.forEach(m => {
+          const isNew = m.isNew || false;
+          const tagClass = isNew ? 'new-tag' : 'continued';
+          const prefix = isNew ? '➕ ' : '';
+          html += `<span class="med-tag ${tagClass}">${prefix}${formatMedShort(m)}${isNew ? '（新增长期）' : '（按原方案继续服用）'}</span>`;
+        });
+        html += `</div></div>`;
+      }
+
+      if (stopped.length > 0) {
+        html += `<div class="med-section">`;
+        html += `<div class="med-label">🛑 已停用</div><div class="med-tags">`;
+        stopped.forEach(m => {
+          html += `<span class="med-tag discontinued-tag">${formatMedShort(m)}</span>`;
+        });
+        html += `</div></div>`;
+      }
+
+      if (temp.length > 0) {
+        html += `<div class="med-section">`;
+        html += `<div class="med-label">📋 临时用药</div><div class="med-tags">`;
+        temp.forEach(m => {
+          html += `<span class="med-tag temp-tag">${formatMedShort(m)}</span>`;
+        });
+        html += `</div></div>`;
+      }
+
+      return html || '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
+    }
+
+    function updateCountdown() {
+      const records=loadRecords();
+      let nearest=null;
+      const today=new Date(); today.setHours(0,0,0,0);
+      records.forEach(r=>{
+        if(r.nextVisit){
+          const d=new Date(r.nextVisit); d.setHours(0,0,0,0);
+          if(d>=today && (!nearest || d<new Date(nearest))) nearest=r.nextVisit;
+        }
+      });
+      const daysEl = document.getElementById('countdownDays');
+      const dateEl = document.getElementById('nextVisitDate');
+      const reminderEl = document.getElementById('referralReminderInline');
+      if (nearest) {
+        const diff = Math.ceil((new Date(nearest)-today)/(1000*60*60*24));
+        daysEl.textContent = diff;
+        dateEl.textContent = '📅 '+nearest;
+        if (diff <= 7 && diff >= 0) {
+          reminderEl.style.display = 'inline';
+        } else {
+          reminderEl.style.display = 'none';
+        }
+      } else {
+        daysEl.textContent = '--';
+        dateEl.textContent = '暂无复查计划';
+        reminderEl.style.display = 'none';
+      }
+    }
+
+    function getWeekday(dateStr) {
+      const d = new Date(dateStr);
+      const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+      return weekdays[d.getDay()];
+    }
+
+    function checkScheduleMatch(record) {
+      if (!record.nextVisit || !record.scheduleDays || record.scheduleDays.length===0) return null;
+      const wd = getWeekday(record.nextVisit);
+      if (record.scheduleDays.includes(wd)) return '✅ 该日期符合医生出诊时间';
+      return '⚠️ 该日期可能不是医生出诊时间，请确认';
+    }
+
+    // ===== 云端数据操作（替代 localStorage） =====
+    async function loadRecordsFromCloud() {
+      try {
+        const result = await apiRequest('GET', '');
+        return result.data || [];
+      } catch(e) {
+        console.warn('从云端加载失败，使用本地缓存:', e);
+        return loadRecords();
+      }
+    }
+
+    async function saveRecordToCloud(record) {
+      const result = await apiRequest('POST', '', record);
+      return result.data;
+    }
+
+    async function deleteRecordFromCloud(id) {
+      await apiRequest('DELETE', '/' + id);
+    }
+
+    async function clearAllRecordsCloud() {
+      await apiRequest('DELETE', '');
+    }
+
+    // ===== 渲染时间线（改为异步加载） =====
+    async function renderTimeline() {
+      // 先从云端加载最新数据
+      const records = await loadRecordsFromCloud();
+      // 同时更新本地缓存
+      saveRecordsLocal(records);
+      
+      const container = document.getElementById('timelineContainer');
+      const countSpan = document.getElementById('recordCount');
+      const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+      const privacyOn = loadPrivacy();
+
+      document.getElementById('viewerOverlay').classList.toggle('privacy-on', privacyOn);
+
+      let filtered = records;
+      if(searchVal) {
+        filtered = records.filter(r => {
+          const hospital = (r.hospital||'').toLowerCase();
+          const doctor = (r.doctor||'').toLowerCase();
+          const meds = (r.medications||[]).map(m=>m.name||'').join(' ').toLowerCase();
+          return hospital.includes(searchVal) || doctor.includes(searchVal) || meds.includes(searchVal);
+        });
+      }
+
+      const data = resetCheckinIfNewDay();
+      const hasAnyCheckin = data.morning.checked || data.afternoon.checked || data.evening.checked;
+      let checkinCardHtml = '';
+      if (hasAnyCheckin) {
+        const parts = [];
+        if (data.morning.checked) parts.push(`☀️ 早上 ✅ ${data.morning.time}`);
+        if (data.afternoon.checked) parts.push(`🌤 下午 ✅ ${data.afternoon.time}`);
+        if (data.evening.checked) parts.push(`🌙 晚上 ✅ ${data.evening.time}`);
+        checkinCardHtml = `
+          <div class="record-card checkin-card">
+            <div class="card-top"><div class="card-left"><div class="date"><i class="fas fa-check-circle" style="color:#1f8b5a;"></i> 📅 今日服药记录 · ${parts.join(' · ')}</div></div></div>
+          </div>
+        `;
+      }
+
+      if(filtered.length===0 && !checkinCardHtml) {
+        container.innerHTML = `<div class="empty-message"><i class="far fa-smile" style="font-size:2rem; display:block; margin-bottom:8px;"></i> 没有记录，开始添加吧 🌱</div>`;
+        countSpan.textContent = records.length + ' 条记录';
+        updateCountdown(); updateCheckinUI(); applyPrivacy(); return;
+      }
+
+      const sorted = [...filtered].sort((a,b)=> a.date < b.date ? 1 : -1);
+      let html = checkinCardHtml;
+      sorted.forEach((record) => {
+        const currMeds = record.medications || [];
+
+        let hasChange = false;
+        if (currMeds.some(m => m.status === '已停用' || m.isNew)) hasChange = true;
+        let warningTag = hasChange ? `<span class="tag-warning"><i class="fas fa-exclamation-circle"></i> 用药有调整</span>` : '';
+
+        const medDisplayHtml = buildMedicationDisplay(currMeds);
+
+        let symptomHtml = '';
+        if(record.purpose==='针对性检查' && record.symptomReason) {
+          symptomHtml = `<div style="font-size:0.85rem; color:#3e6b8a; margin-top:2px;"><i class="fas fa-stethoscope"></i> ${record.symptomReason}</div>`;
+        }
+
+        const imgCount = (record.images||[]).length;
+        const viewBtn = imgCount>0 ? `<button class="btn-sm view-images-btn" data-id="${record.id}"><i class="fas fa-images"></i> 查看图片 (${imgCount})</button>` : `<span style="color:#b0c8dd;font-size:0.8rem;"><i class="far fa-image"></i> 无图片</span>`;
+
+        let metricHtml = '';
+        if(record.metricValue) metricHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-chart-line"></i> 指标: ${record.metricValue}</div>`;
+        let weightHtml = '';
+        if(record.recordWeight) weightHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-weight"></i> 体重: ${record.recordWeight} kg</div>`;
+
+        let intervalText = '';
+        const prevRec = getPrevRecord(records, record.id);
+        if (prevRec) {
+          const d1 = new Date(prevRec.date);
+          const d2 = new Date(record.date);
+          const diff = Math.floor((d2 - d1) / (1000*60*60*24));
+          intervalText = `距离上次就诊已过 ${diff} 天`;
+        } else {
+          intervalText = '首次记录';
+        }
+
+        let scheduleHtml = '';
+        if (record.scheduleDays && record.scheduleDays.length>0) {
+          const daysStr = record.scheduleDays.join('、');
+          const period = record.schedulePeriod || '上午';
+          scheduleHtml = `<div style="font-size:0.8rem; color:#2d6b8f;"><i class="far fa-clock"></i> 出诊时间：${daysStr} ${period}</div>`;
+          if (record.nextVisit) {
+            const match = checkScheduleMatch(record);
+            if (match) {
+              scheduleHtml += `<div style="font-size:0.8rem; color:${match.includes('✅')?'#1f8b5a':'#b45f1a'};">${match}</div>`;
+            }
+          }
+        }
+
+        let costHtml = '';
+        const total = (record.costRegistration||0) + (record.costExam||0) + (record.costDrug||0) + (record.costTransport||0);
+        if (total > 0) {
+          costHtml = `<span class="cost-summary">💰 合计：${total.toFixed(2)} 元</span>`;
+        }
+
+        html += `
+          <div class="record-card" data-id="${record.id}">
+            <div class="card-top">
+              <div class="card-left">
+                <div class="date">${warningTag} <i class="far fa-calendar-alt"></i> ${record.date||'无日期'}<span style="font-size:0.8rem;font-weight:400;color:#5682a3;margin-left:6px;">${record.purpose||''}</span></div>
+                <div class="hospital-doctor private-field"><span><i class="fas fa-hospital-alt"></i> ${record.hospital||'—'}</span><span><i class="fas fa-user-md"></i> ${record.doctor||'—'}</span></div>
+                ${symptomHtml}
+                ${medDisplayHtml}
+                ${metricHtml}${weightHtml}
+                ${record.feelings ? `<div style="font-size:0.85rem;color:#456f8f;margin-top:4px;"><i class="fas fa-quote-left" style="opacity:0.5;"></i> ${record.feelings.substring(0,60)}${record.feelings.length>60?'…':''}</div>` : ''}
+                ${record.nextVisit ? `<div style="font-size:0.8rem;color:#2d6b8f;margin-top:2px;"><i class="far fa-calendar-check"></i> 下次复查: ${record.nextVisit}</div>` : ''}
+                ${scheduleHtml}
+              </div>
+              <div class="card-actions">
+                ${viewBtn}
+                <button class="btn-sm edit-btn" data-id="${record.id}"><i class="fas fa-edit"></i> 编辑</button>
+                <button class="btn-sm btn-danger-sm delete-btn" data-id="${record.id}"><i class="fas fa-trash-alt"></i> 删除</button>
+              </div>
+            </div>
+            <div class="card-footer">
+              <span>${intervalText}</span>
+              ${costHtml}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      countSpan.textContent = records.length + ' 条记录';
+      updateCountdown(); updateCheckinUI(); applyPrivacy();
+
+      document.querySelectorAll('.view-images-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openViewer(this.dataset.id); }));
+      document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openEditModal(this.dataset.id); }));
+      document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click', async function(e){ e.stopPropagation(); 
+        if (confirm('确定要删除这条记录吗？')) {
+          try {
+            await deleteRecordFromCloud(this.dataset.id);
+            await renderTimeline();
+          } catch(err) {
+            alert('删除失败: ' + err.message);
+          }
+        }
+      }));
+    }
+
+    function applyPrivacy() {
+      const on = loadPrivacy();
+      document.getElementById('appContainer').classList.toggle('privacy-hidden', on);
+      document.getElementById('viewerOverlay').classList.toggle('privacy-on', on);
+    }
+
+    // ===== 图片查看器 =====
+    let viewerImages=[], viewerIdx=0, viewerScale=1, viewerRot=0;
+    function openViewer(id) {
+      const records=loadRecords(); const r=records.find(x=>x.id===id);
+      if(!r||!r.images||r.images.length===0){ alert('无图片'); return; }
+      viewerImages=r.images; viewerIdx=0; viewerScale=1; viewerRot=0;
+      document.getElementById('viewerOverlay').classList.add('active');
+      document.getElementById('viewerOverlay').classList.toggle('privacy-on', loadPrivacy());
+      showViewerImage();
+    }
+    function showViewerImage() {
+      const img=document.getElementById('viewerImage');
+      if(viewerImages.length===0){ img.src=''; document.getElementById('viewerIndicator').textContent='0/0'; return; }
+      img.src=viewerImages[viewerIdx];
+      img.style.transform = `scale(${viewerScale}) rotate(${viewerRot}deg)`;
+      document.getElementById('viewerIndicator').textContent=`${viewerIdx+1} / ${viewerImages.length}`;
+    }
+    function closeViewer(){ document.getElementById('viewerOverlay').classList.remove('active'); }
+    document.getElementById('viewerCloseBtn').addEventListener('click', closeViewer);
+    document.getElementById('viewerOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('viewerOverlay')) closeViewer(); });
+    document.getElementById('viewerPrev').addEventListener('click', ()=>{ if(viewerImages.length===0)return; viewerIdx=(viewerIdx-1+viewerImages.length)%viewerImages.length; showViewerImage(); });
+    document.getElementById('viewerNext').addEventListener('click', ()=>{ if(viewerImages.length===0)return; viewerIdx=(viewerIdx+1)%viewerImages.length; showViewerImage(); });
+    document.getElementById('viewerZoomIn').addEventListener('click', ()=>{ viewerScale=Math.min(3, viewerScale+0.2); showViewerImage(); });
+    document.getElementById('viewerZoomOut').addEventListener('click', ()=>{ viewerScale=Math.max(0.3, viewerScale-0.2); showViewerImage(); });
+    document.getElementById('viewerRotate').addEventListener('click', ()=>{ viewerRot=(viewerRot+90)%360; showViewerImage(); });
+    document.addEventListener('keydown', e=>{
+      if(document.getElementById('viewerOverlay').classList.contains('active')){
+        if(e.key==='ArrowLeft'){ document.getElementById('viewerPrev').click(); e.preventDefault(); }
+        else if(e.key==='ArrowRight'){ document.getElementById('viewerNext').click(); e.preventDefault(); }
+        else if(e.key==='Escape'){ closeViewer(); }
+      }
+    });
+
+    // ===== 弹窗逻辑 =====
+    const modalOverlay=document.getElementById('modalOverlay');
+    const openModalBtn=document.getElementById('openModalBtn');
+    const cancelModalBtn=document.getElementById('cancelModalBtn');
+    const recordForm=document.getElementById('recordForm');
+    const editIdInput=document.getElementById('editRecordId');
+    const modalTitle=document.getElementById('modalTitle');
+    const medicationGroup=document.getElementById('medicationGroup');
+    const addMedBtn=document.getElementById('addMedBtn');
+
+    // ===== 添加一行用药 =====
+    function addMedRow(name='', spec='', usage='', self=false, longTerm=false, status='服用中') {
+      const row = document.createElement('div'); 
+      row.className = 'med-row';
+      row.innerHTML = `
+        <div class="med-field" style="flex:2 1 120px; position:relative;">
+          <div class="med-name-wrapper">
+            <input type="text" class="med-name" placeholder="药名" value="${name}" autocomplete="off">
+            <div class="med-name-suggestions"></div>
+          </div>
+        </div>
+        <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${spec}"></div>
+        <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${usage}"></div>
+        <div class="med-check"><label><input type="checkbox" class="med-self" ${self?'checked':''}> 自备</label></div>
+        <div class="med-check"><label><input type="checkbox" class="med-longterm" ${longTerm?'checked':''}> 长期</label></div>
+        <div class="med-status">
+          <select class="med-status-select">
+            <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
+            <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
+            <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
+          </select>
+        </div>
+        <button type="button" class="btn-remove-med">&times;</button>
+      `;
+      medicationGroup.appendChild(row);
+      updateRemoveBtns();
+      
+      row.querySelector('.btn-remove-med').addEventListener('click', function() {
+        if (medicationGroup.children.length > 1) {
+          row.remove();
+          updateRemoveBtns();
+          autoSaveDraft();
+        } else {
+          alert('至少保留一种用药，可留空表示无用药。');
+        }
+      });
+      
+      setupNameSuggestion(row.querySelector('.med-name'));
+      
+      row.querySelectorAll('input, select').forEach(inp => {
+        inp.addEventListener('input', autoSaveDraft);
+        inp.addEventListener('change', autoSaveDraft);
+      });
+      
+      if (name) {
+        autoFillDrugHistory(row.querySelector('.med-name'));
+      }
+    }
+
+    function updateRemoveBtns() {
+      const rows = medicationGroup.querySelectorAll('.med-row');
+      rows.forEach((row, i) => {
+        const btn = row.querySelector('.btn-remove-med');
+        btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+      });
+    }
+
+    // ===== 药名联想 =====
+    function setupNameSuggestion(input) {
+      const wrapper = input.closest('.med-name-wrapper');
+      const suggestions = wrapper.querySelector('.med-name-suggestions');
+      
+      input.addEventListener('input', function() {
+        const val = this.value.trim().toLowerCase();
+        if (!val) { suggestions.classList.remove('show'); return; }
+        const history = getHistoricalDrugNames();
+        const matched = history.filter(name => name.toLowerCase().includes(val));
+        if (matched.length === 0) { suggestions.classList.remove('show'); return; }
+        suggestions.innerHTML = matched.map(name => 
+          `<div class="sug-item" data-name="${name}">${name}</div>`
+        ).join('');
+        suggestions.classList.add('show');
+      });
+
+      input.addEventListener('blur', function() {
+        setTimeout(() => suggestions.classList.remove('show'), 200);
+      });
+
+      suggestions.addEventListener('click', function(e) {
+        const item = e.target.closest('.sug-item');
+        if (item) {
+          const name = item.dataset.name;
+          input.value = name;
+          suggestions.classList.remove('show');
+          autoFillDrugHistory(input);
+          autoSaveDraft();
+        }
+      });
+    }
+
+    function autoFillDrugHistory(input) {
+      const name = input.value.trim();
+      if (!name) return;
+      const history = getDrugHistory(name);
+      if (!history) return;
+      const row = input.closest('.med-row');
+      const specInput = row.querySelector('.med-spec');
+      const usageInput = row.querySelector('.med-usage');
+      const longTermCheck = row.querySelector('.med-longterm');
+      if (history.spec && !specInput.value) specInput.value = history.spec;
+      if (history.usage && !usageInput.value) usageInput.value = history.usage;
+      if (history.longTerm) longTermCheck.checked = true;
+    }
+
+    function initAllNameSuggestions() {
+      document.querySelectorAll('.med-name').forEach(inp => setupNameSuggestion(inp));
+    }
+
+    // ===== 费用 =====
+    function updateCostTotal() {
+      const reg = parseFloat(document.getElementById('costRegistration').value) || 0;
+      const exam = parseFloat(document.getElementById('costExam').value) || 0;
+      const drug = parseFloat(document.getElementById('costDrug').value) || 0;
+      const transport = parseFloat(document.getElementById('costTransport').value) || 0;
+      document.getElementById('costTotalDisplay').textContent = (reg + exam + drug + transport).toFixed(2);
+    }
+
+    // ===== 文件上传 =====
+    let selectedFiles=[], existingImages=[], pendingPDFs=[];
+
+    function renderPreview() {
+      const container=document.getElementById('filePreviewContainer'); container.innerHTML='';
+      existingImages.forEach((_,i)=>{ const div=document.createElement('div'); div.className='preview-item'; div.innerHTML=`<i class="fas fa-image"></i> 已有图片 ${i+1} <i class="fas fa-times-circle" data-existing="${i}"></i>`; container.appendChild(div); });
+      selectedFiles.forEach((file,i)=>{ 
+        const icon = file.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image';
+        const label = file.type === 'application/pdf' ? `PDF ${i+1}` : file.name.substring(0,12);
+        const div=document.createElement('div'); div.className='preview-item'; 
+        div.innerHTML=`<i class="fas ${icon}"></i> ${label} <i class="fas fa-times-circle" data-new="${i}"></i>`;
+        container.appendChild(div);
+      });
+      container.querySelectorAll('[data-existing]').forEach(el=>el.addEventListener('click', function(){ const idx=parseInt(this.dataset.existing); existingImages.splice(idx,1); renderPreview(); autoSaveDraft(); }));
+      container.querySelectorAll('[data-new]').forEach(el=>el.addEventListener('click', function(){ const idx=parseInt(this.dataset.new); selectedFiles.splice(idx,1); renderPreview(); autoSaveDraft(); }));
+    }
+
+    // ===== 重置弹窗 =====
+    function resetModal() {
+      recordForm.reset(); 
+      selectedFiles=[]; existingImages=[]; pendingPDFs=[]; 
+      renderPreview(); 
+      medicationGroup.innerHTML = '';
+      addMedRow('','','',false,false,'服用中');
+      updateRemoveBtns();
+      document.getElementById('visitDate').value=new Date().toISOString().slice(0,10);
+      document.getElementById('examPurpose').value='常规复查';
+      document.getElementById('symptomGroup').classList.remove('visible');
+      document.getElementById('symptomReason').value='';
+      document.getElementById('nextVisitDateInput').value='';
+      document.getElementById('metricValue').value='';
+      document.getElementById('recordWeight').value='';
+      document.getElementById('costRegistration').value='0';
+      document.getElementById('costExam').value='0';
+      document.getElementById('costDrug').value='0';
+      document.getElementById('costTransport').value='0';
+      document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+      document.getElementById('schedulePeriod').value='上午';
+      updateCostTotal();
+      editIdInput.value=''; modalTitle.innerHTML='<i class="fas fa-notes-medical"></i> 新就诊记录';
+      clearDraft();
+      initAllNameSuggestions();
+    }
+
+    // ===== 编辑回填 =====
+    function openEditModal(id){
+      const records = loadRecords();
+      const r = records.find(x => x.id === id);
+      if (!r) return;
+      
+      resetModal();
+      editIdInput.value = id;
+      modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
+      
+      document.getElementById('visitDate').value = r.date || '';
+      document.getElementById('hospitalName').value = r.hospital || '';
+      document.getElementById('doctorName').value = r.doctor || '';
+      document.getElementById('examPurpose').value = r.purpose || '常规复查';
+      
+      if (r.scheduleDays && r.scheduleDays.length > 0) {
+        document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
+          cb.checked = r.scheduleDays.includes(cb.value);
+        });
+      }
+      document.getElementById('schedulePeriod').value = r.schedulePeriod || '上午';
+      
+      if (r.purpose === '针对性检查') {
+        document.getElementById('symptomGroup').classList.add('visible');
+      }
+      document.getElementById('symptomReason').value = r.symptomReason || '';
+      document.getElementById('feelings').value = r.feelings || '';
+      document.getElementById('nextVisitDateInput').value = r.nextVisit || '';
+      document.getElementById('metricValue').value = r.metricValue || '';
+      document.getElementById('recordWeight').value = r.recordWeight || '';
+      document.getElementById('costRegistration').value = r.costRegistration || 0;
+      document.getElementById('costExam').value = r.costExam || 0;
+      document.getElementById('costDrug').value = r.costDrug || 0;
+      document.getElementById('costTransport').value = r.costTransport || 0;
+      updateCostTotal();
+      
+      if (r.medications && r.medications.length > 0) {
+        medicationGroup.innerHTML = '';
+        r.medications.forEach((m, idx) => {
+          const status = m.status || '服用中';
+          if (idx === 0) {
+            const row = document.createElement('div'); 
+            row.className = 'med-row';
+            row.innerHTML = `
+              <div class="med-field" style="flex:2 1 120px; position:relative;">
+                <div class="med-name-wrapper">
+                  <input type="text" class="med-name" placeholder="药名" value="${m.name || ''}" autocomplete="off">
+                  <div class="med-name-suggestions"></div>
+                </div>
+              </div>
+              <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${m.spec || ''}"></div>
+              <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${m.usage || ''}"></div>
+              <div class="med-check"><label><input type="checkbox" class="med-self" ${m.selfSupplied?'checked':''}> 自备</label></div>
+              <div class="med-check"><label><input type="checkbox" class="med-longterm" ${m.longTerm?'checked':''}> 长期</label></div>
+              <div class="med-status">
+                <select class="med-status-select">
+                  <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
+                  <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
+                  <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
+                </select>
+              </div>
+              <button type="button" class="btn-remove-med">&times;</button>
+            `;
+            medicationGroup.appendChild(row);
+            row.querySelector('.btn-remove-med').addEventListener('click', function() {
+              if (medicationGroup.children.length > 1) {
+                row.remove();
+                updateRemoveBtns();
+                autoSaveDraft();
+              } else {
+                alert('至少保留一种用药，可留空表示无用药。');
+              }
+            });
+            setupNameSuggestion(row.querySelector('.med-name'));
+            row.querySelectorAll('input, select').forEach(inp => {
+              inp.addEventListener('input', autoSaveDraft);
+              inp.addEventListener('change', autoSaveDraft);
+            });
+          } else {
+            addMedRow(m.name || '', m.spec || '', m.usage || '', !!m.selfSupplied, !!m.longTerm, status);
+          }
+        });
+        updateRemoveBtns();
+      }
+      
+      existingImages = r.images || [];
+      renderPreview();
+      initAllNameSuggestions();
+      modalOverlay.classList.add('active');
+      clearDraft();
+    }
+
+    // ===== 草稿 =====
+    function openModalWithDraftCheck() {
+      const draft = loadDraft();
+      if (draft && Object.keys(draft).length > 1) {
+        if (confirm('检测到未保存的草稿，是否恢复？')) {
+          resetModal();
+          restoreDraft(draft);
+          modalOverlay.classList.add('active');
+          return;
+        } else {
+          clearDraft();
+        }
+      }
+      resetModal();
+      modalOverlay.classList.add('active');
+    }
+
+    function restoreDraft(draft) {
+      if (!draft) return false;
+      try {
+        if (draft.editId) editIdInput.value = draft.editId;
+        if (draft.visitDate) document.getElementById('visitDate').value = draft.visitDate;
+        if (draft.hospitalName) document.getElementById('hospitalName').value = draft.hospitalName;
+        if (draft.doctorName) document.getElementById('doctorName').value = draft.doctorName;
+        if (draft.schedulePeriod) document.getElementById('schedulePeriod').value = draft.schedulePeriod;
+        if (draft.examPurpose) document.getElementById('examPurpose').value = draft.examPurpose;
+        if (draft.symptomReason) document.getElementById('symptomReason').value = draft.symptomReason;
+        if (draft.recordWeight) document.getElementById('recordWeight').value = draft.recordWeight;
+        if (draft.metricValue) document.getElementById('metricValue').value = draft.metricValue;
+        if (draft.costRegistration) document.getElementById('costRegistration').value = draft.costRegistration;
+        if (draft.costExam) document.getElementById('costExam').value = draft.costExam;
+        if (draft.costDrug) document.getElementById('costDrug').value = draft.costDrug;
+        if (draft.costTransport) document.getElementById('costTransport').value = draft.costTransport;
+        if (draft.feelings) document.getElementById('feelings').value = draft.feelings;
+        if (draft.nextVisitDateInput) document.getElementById('nextVisitDateInput').value = draft.nextVisitDateInput;
+        
+        if (draft.scheduleDays && draft.scheduleDays.length>0) {
+          const checkboxes = document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]');
+          checkboxes.forEach(cb => {
+            cb.checked = draft.scheduleDays.includes(cb.value);
+          });
+        }
+        
+        if (draft.medications && draft.medications.length>0) {
+          medicationGroup.innerHTML = '';
+          draft.medications.forEach((m, idx) => {
+            const status = m.status || '服用中';
+            if (idx === 0) {
+              const row = document.createElement('div'); 
+              row.className = 'med-row';
+              row.innerHTML = `
+                <div class="med-field" style="flex:2 1 120px; position:relative;">
+                  <div class="med-name-wrapper">
+                    <input type="text" class="med-name" placeholder="药名" value="${m.name || ''}" autocomplete="off">
+                    <div class="med-name-suggestions"></div>
+                  </div>
+                </div>
+                <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${m.spec || ''}"></div>
+                <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${m.usage || ''}"></div>
+                <div class="med-check"><label><input type="checkbox" class="med-self" ${m.selfSupplied?'checked':''}> 自备</label></div>
+                <div class="med-check"><label><input type="checkbox" class="med-longterm" ${m.longTerm?'checked':''}> 长期</label></div>
+                <div class="med-status">
+                  <select class="med-status-select">
+                    <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
+                    <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
+                    <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-remove-med">&times;</button>
+              `;
+              medicationGroup.appendChild(row);
+              row.querySelector('.btn-remove-med').addEventListener('click', function() {
+                if (medicationGroup.children.length > 1) {
+                  row.remove();
+                  updateRemoveBtns();
+                  autoSaveDraft();
+                } else {
+                  alert('至少保留一种用药，可留空表示无用药。');
+                }
+              });
+              setupNameSuggestion(row.querySelector('.med-name'));
+              row.querySelectorAll('input, select').forEach(inp => {
+                inp.addEventListener('input', autoSaveDraft);
+                inp.addEventListener('change', autoSaveDraft);
+              });
+            } else {
+              addMedRow(m.name || '', m.spec || '', m.usage || '', !!m.selfSupplied, !!m.longTerm, status);
+            }
+          });
+          updateRemoveBtns();
+        }
+        
+        if (draft.editId) {
+          modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
+        }
+        
+        updateCostTotal();
+        return true;
+      } catch(e) { return false; }
+    }
+
+    function autoSaveDraft() {
+      const formData = {
+        editId: editIdInput.value,
+        visitDate: document.getElementById('visitDate').value,
+        hospitalName: document.getElementById('hospitalName').value,
+        doctorName: document.getElementById('doctorName').value,
+        scheduleDays: getSelectedScheduleDays(),
+        schedulePeriod: document.getElementById('schedulePeriod').value,
+        examPurpose: document.getElementById('examPurpose').value,
+        symptomReason: document.getElementById('symptomReason').value,
+        recordWeight: document.getElementById('recordWeight').value,
+        metricValue: document.getElementById('metricValue').value,
+        costRegistration: document.getElementById('costRegistration').value,
+        costExam: document.getElementById('costExam').value,
+        costDrug: document.getElementById('costDrug').value,
+        costTransport: document.getElementById('costTransport').value,
+        feelings: document.getElementById('feelings').value,
+        nextVisitDateInput: document.getElementById('nextVisitDateInput').value,
+        medications: getMedsData(),
+        hasImages: selectedFiles.length > 0 || existingImages.length > 0
+      };
+      saveDraft(formData);
+    }
+
+    function getSelectedScheduleDays() {
+      const checkboxes = document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]');
+      const days = [];
+      checkboxes.forEach(cb => { if (cb.checked) days.push(cb.value); });
+      return days;
+    }
+
+    // ===== 完整收集所有用药数据 =====
+    function getMedsData() {
+      const rows = medicationGroup.querySelectorAll('.med-row');
+      const list = [];
+      rows.forEach(row => {
+        const name = row.querySelector('.med-name').value.trim();
+        const spec = row.querySelector('.med-spec').value.trim();
+        const usage = row.querySelector('.med-usage').value.trim();
+        const selfSupplied = row.querySelector('.med-self').checked;
+        const longTerm = row.querySelector('.med-longterm').checked;
+        const statusEl = row.querySelector('.med-status-select');
+        let status = statusEl ? statusEl.value : '服用中';
+        if (!status) status = '服用中';
+        if (name) {
+          list.push({ 
+            name, 
+            spec: spec || '', 
+            usage: usage || '', 
+            selfSupplied, 
+            longTerm,
+            status
+          });
+        }
+      });
+      return list;
+    }
+
+    function setupAutoSave() {
+      const fields = ['visitDate','hospitalName','doctorName','schedulePeriod','examPurpose','symptomReason',
+        'recordWeight','metricValue','costRegistration','costExam','costDrug','costTransport','feelings','nextVisitDateInput'];
+      fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', autoSaveDraft);
+          el.addEventListener('change', autoSaveDraft);
+        }
+      });
+      document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', autoSaveDraft);
+      });
+      medicationGroup.addEventListener('input', autoSaveDraft);
+      medicationGroup.addEventListener('change', autoSaveDraft);
+    }
+
+    openModalBtn.addEventListener('click', openModalWithDraftCheck);
+    
+    cancelModalBtn.addEventListener('click', function() {
+      const draft = loadDraft();
+      if (draft && Object.keys(draft).length > 1) {
+        if (confirm('当前内容尚未保存，确定要退出吗？')) {
+          clearDraft();
+          modalOverlay.classList.remove('active');
+        }
+      } else {
+        modalOverlay.classList.remove('active');
+      }
+    });
+    
+    modalOverlay.addEventListener('click', e=>{ 
+      if(e.target===modalOverlay) {
+        const draft = loadDraft();
+        if (draft && Object.keys(draft).length > 1) {
+          if (confirm('当前内容尚未保存，确定要退出吗？')) {
+            clearDraft();
+            modalOverlay.classList.remove('active');
+          }
+        } else {
+          modalOverlay.classList.remove('active');
+        }
+      }
+    });
+    
+    addMedBtn.addEventListener('click', ()=>addMedRow('','','',false,false,'服用中'));
+    document.getElementById('examPurpose').addEventListener('change', function(){ 
+      document.getElementById('symptomGroup').classList.toggle('visible', this.value==='针对性检查');
+      autoSaveDraft();
+    });
+
+    // ===== 文件上传 =====
+    const dropArea=document.getElementById('dropArea'), fileInput=document.getElementById('fileInput');
+    async function handleFiles(files) {
+      for (let f of files) {
+        if (f.type === 'application/pdf') {
+          selectedFiles.push(f);
+        } else if (f.type === 'image/jpeg' || f.type === 'image/png') {
+          selectedFiles.push(f);
+        }
+      }
+      renderPreview();
+      autoSaveDraft();
+    }
+
+    dropArea.addEventListener('click', ()=>fileInput.click());
+    dropArea.addEventListener('dragover', e=>{ e.preventDefault(); dropArea.classList.add('dragover'); });
+    dropArea.addEventListener('dragleave', ()=>dropArea.classList.remove('dragover'));
+    dropArea.addEventListener('drop', async e=>{ 
+      e.preventDefault(); dropArea.classList.remove('dragover'); 
+      if(e.dataTransfer.files.length) await handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', async e=>{ if(e.target.files.length){ await handleFiles(e.target.files); fileInput.value=''; } });
+
+    // ===== 保存记录（云端） =====
+    function showSaveFeedback(msg, isSuccess = true) {
+      const el = document.getElementById('saveFeedback');
+      el.textContent = msg;
+      el.style.display = 'block';
+      el.style.color = isSuccess ? '#1f6b4a' : '#b45f1a';
+      el.style.background = isSuccess ? '#e6f5e9' : '#fff4e5';
+      setTimeout(() => { el.style.display = 'none'; }, 3000);
+    }
+
+    recordForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const date=document.getElementById('visitDate').value;
+      const hospital=document.getElementById('hospitalName').value.trim();
+      const doctor=document.getElementById('doctorName').value.trim();
+      const purpose=document.getElementById('examPurpose').value;
+      const symptomReason=document.getElementById('symptomReason').value.trim();
+      const feelings=document.getElementById('feelings').value.trim();
+      const nextVisit=document.getElementById('nextVisitDateInput').value;
+      const metricValue=document.getElementById('metricValue').value.trim();
+      const recordWeight=document.getElementById('recordWeight').value.trim();
+      const scheduleDays = getSelectedScheduleDays();
+      const schedulePeriod = document.getElementById('schedulePeriod').value;
+      const costRegistration=parseFloat(document.getElementById('costRegistration').value) || 0;
+      const costExam=parseFloat(document.getElementById('costExam').value) || 0;
+      const costDrug=parseFloat(document.getElementById('costDrug').value) || 0;
+      const costTransport=parseFloat(document.getElementById('costTransport').value) || 0;
+      
+      const medications = getMedsData();
+      const editId=document.getElementById('editRecordId').value;
+      
+      if(!date||!hospital||!doctor){ alert('请填写日期、医院、医生'); return; }
+
+      let compressed = [...existingImages];
+      for (let f of selectedFiles) {
+        try {
+          const img = await compressImage(f);
+          compressed.push(img);
+        } catch(e) {}
+      }
+
+      // 标记新药
+      const finalMeds = medications.map(m => {
+        return { ...m, isNew: false };
+      });
+
+      const recordData = {
+        id: editId || undefined,
+        date, hospital, doctor, purpose,
+        symptomReason: purpose==='针对性检查' ? symptomReason : '', 
+        feelings, 
+        nextVisit: nextVisit || '', 
+        medications: finalMeds,
+        metricValue, recordWeight, 
+        scheduleDays, schedulePeriod,
+        costRegistration, costExam, costDrug, costTransport,
+        images: compressed
+      };
+
+      try {
+        let result;
+        if (editId) {
+          // 编辑：先删再增，或直接调用更新（API支持）
+          // 简单处理：删除旧的再新增
+          await deleteRecordFromCloud(editId);
+          delete recordData.id;
+          result = await saveRecordToCloud(recordData);
+        } else {
+          finalMeds.forEach(m => m.isNew = true);
+          result = await saveRecordToCloud(recordData);
+        }
+        
+        const submittedCount = medications.filter(m => m.name && m.name.trim() !== '').length;
+        showSaveFeedback(`✅ 保存成功，共 ${submittedCount} 种药`);
+        
+        clearDraft();
+        await renderTimeline(); 
+        modalOverlay.classList.remove('active');
+      } catch(err) {
+        showSaveFeedback('❌ 保存失败: ' + err.message, false);
+      }
+    });
+
+    document.getElementById('clearAllBtn').addEventListener('click', async ()=>{ 
+      if (confirm('确定要删除所有就诊记录吗？此操作不可恢复！')) {
+        try {
+          await clearAllRecordsCloud();
+          await renderTimeline();
+        } catch(err) {
+          alert('清除失败: ' + err.message);
+        }
+      }
+    });
+
+    document.getElementById('resetAllBtn').addEventListener('click', function() {
+      if (confirm('确定要清空所有健康档案数据吗？此操作不可恢复！')) {
+        localStorage.clear();
+        location.reload();
+      }
+    });
+
+    document.getElementById('searchInput').addEventListener('input', renderTimeline);
+
+    document.getElementById('privacyToggle').addEventListener('change', function(){
+      savePrivacy(this.checked); applyPrivacy(); renderTimeline();
+    });
+
+    // ===== 导出报告 =====
+    document.getElementById('exportReportBtn').addEventListener('click', function(){
+      const records=loadRecords();
+      if(records.length===0){ alert('没有记录可导出'); return; }
+      const sorted=[...records].sort((a,b)=>a.date<b.date?1:-1);
+      let html='<div style="font-family:Segoe UI,sans-serif; padding:0.5rem;">';
+      html+=`<h3 style="border-bottom:2px solid #1f4a6e; padding-bottom:0.5rem;">📋 健康档案报告</h3><p>共 ${records.length} 条记录</p>`;
+      sorted.forEach(r=>{
+        const total = (r.costRegistration||0)+(r.costExam||0)+(r.costDrug||0)+(r.costTransport||0);
+        html+=`<div style="border:1px solid #e0eaf3; border-radius:20px; padding:1rem; margin:1rem 0; background:#fafdff;">`;
+        html+=`<div><strong>${r.date||''}</strong> · ${r.hospital||''} · ${r.doctor||''}</div>`;
+        html+=`<div style="font-size:0.9rem; color:#2d577a;">检查目的: ${r.purpose||''}</div>`;
+        if(r.symptomReason) html+=`<div style="font-size:0.9rem;">症状: ${r.symptomReason}</div>`;
+        if(r.medications && r.medications.length){
+          html+=`<div style="font-size:0.9rem;">用药: ${r.medications.map(m=>{
+            let label = `${m.name||''}${m.spec?' · '+m.spec:''}${m.usage?' · '+m.usage:''}`;
+            if(m.selfSupplied) label += ' · 自备';
+            if(m.longTerm) label += ' · 长期';
+            label += ` (${m.status||'服用中'})`;
+            return label;
+          }).join('; ')}</div>`;
+        }
+        if(r.feelings) html+=`<div style="font-size:0.9rem;">感想: ${r.feelings}</div>`;
+        if(r.nextVisit) html+=`<div style="font-size:0.9rem;">下次复查: ${r.nextVisit}</div>`;
+        if(r.scheduleDays && r.scheduleDays.length>0) {
+          html+=`<div style="font-size:0.9rem;">出诊时间: ${r.scheduleDays.join('、')} ${r.schedulePeriod||''}</div>`;
+        }
+        if(total>0) {
+          html+=`<div style="font-size:0.9rem;">💰 费用: 挂号费 ${(r.costRegistration||0).toFixed(2)}元, 检查费 ${(r.costExam||0).toFixed(2)}元, 药费 ${(r.costDrug||0).toFixed(2)}元, 交通费 ${(r.costTransport||0).toFixed(2)}元, 合计 ${total.toFixed(2)}元</div>`;
+        }
+        if(r.images && r.images.length>0) {
+          const imgs = r.images.filter(img => !img.startsWith('PDF:'));
+          if (imgs.length>0) {
+            const show = imgs.slice(0,3);
+            const rest = imgs.length - 3;
+            html+=`<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">`;
+            show.forEach(img => {
+              html+=`<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:12px;border:1px solid #d6e3f0;">`;
+            });
+            if(rest>0) html+=`<span style="display:inline-flex;align-items:center;font-size:0.8rem;color:#5a7f9e;">+${rest}张</span>`;
+            html+=`</div>`;
+          }
+        }
+        html+=`</div>`;
+      });
+      html+='</div>';
+      document.getElementById('reportContent').innerHTML=html;
+      document.getElementById('reportModalOverlay').classList.add('active');
+    });
+
+    document.getElementById('closeReportBtn').addEventListener('click', ()=>document.getElementById('reportModalOverlay').classList.remove('active'));
+    document.getElementById('printReportBtn').addEventListener('click', function(){
+      const content=document.getElementById('reportContent').innerHTML;
+      const win=window.open('', '_blank');
+      win.document.write(`<html><head><title>健康报告</title><style>body{font-family:Segoe UI,sans-serif;padding:2rem;}img{max-width:100px;}</style></head><body>${content}<script>window.onload=function(){ window.print(); }<\/script></body></html>`);
+      win.document.close();
+    });
+    document.getElementById('reportModalOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('reportModalOverlay')) document.getElementById('reportModalOverlay').classList.remove('active'); });
+
+    // ===== 数据导入/导出 =====
+    document.getElementById('exportDataBtn').addEventListener('click', function() {
+      const data = {
+        records: loadRecords(),
+        metrics: loadMetrics(),
+        checkin: getCheckinData(),
+        baseHeight: getBaseHeight(),
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `health_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('importDataBtn').addEventListener('click', ()=>document.getElementById('importFileInput').click());
+    document.getElementById('importFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.records) saveRecordsLocal(data.records);
+          if (data.metrics) saveMetrics(data.metrics);
+          if (data.checkin) saveCheckinData(data.checkin);
+          if (data.baseHeight) setBaseHeight(data.baseHeight);
+          alert('数据导入成功！页面即将刷新。');
+          location.reload();
+        } catch(err) { alert('导入失败，请检查文件格式是否正确。'); }
+      };
+      reader.readAsText(file);
+      this.value = '';
+    });
+
+    document.getElementById('metricsToggle').addEventListener('click', function(){
+      const panel=document.getElementById('metricsPanel');
+      panel.classList.toggle('open');
+      this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
+    });
+
+    // ===== 初始化 =====
+    async function init(){
+      document.getElementById('privacyToggle').checked = loadPrivacy();
+      applyPrivacy();
+      resetCheckinIfNewDay();
+      await renderTimeline(); // 改为异步加载云端数据
+      renderMetrics();
+      updateCheckinUI();
+      setupAutoSave();
+      setupCheckinEvents();
+      updateCostTotal();
+      initAllNameSuggestions();
+      ['costRegistration','costExam','costDrug','costTransport'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateCostTotal);
+      });
+    }
+    init();
+
+  })();
+</script>
+</body>
+</html>
