@@ -1,23 +1,17 @@
 export async function onRequest(context) {
   const { request, env } = context;
 
-  // ===== 调试：检查 DB 是否存在 =====
+  // 调试：检查 DB 是否存在
   if (!env.DB) {
     return new Response(JSON.stringify({ error: 'DB binding not found' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }
-  // ===== 调试结束 =====
 
   const url = new URL(request.url);
-  // ... 后面代码保持不变
-export async function onRequest(context) {
-  const { request, env } = context;
-  const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/health/, '') || '/';
-  
-  // CORS 头
+
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
@@ -30,26 +24,22 @@ export async function onRequest(context) {
   }
 
   try {
-    // 解析请求体
     let body = null;
     if (request.method === 'POST') {
       body = await request.json();
     }
 
-    // 路由处理
     let result;
     const recordId = path.split('/').filter(Boolean)[0];
 
     switch (request.method) {
       case 'GET': {
-        // 查询所有记录
         const stmt = env.DB.prepare('SELECT * FROM health_records ORDER BY date DESC');
         const { results } = await stmt.all();
         result = { data: results };
         break;
       }
       case 'POST': {
-        // 插入新记录
         const record = body;
         const stmt = env.DB.prepare(`
           INSERT INTO health_records (
@@ -67,17 +57,15 @@ export async function onRequest(context) {
           JSON.stringify(record.scheduleDays || []), record.schedulePeriod || '上午',
           JSON.stringify(record.medications || []), JSON.stringify(record.images || [])
         ).first();
-        const result = { data: inserted };
+        result = { data: inserted };
         break;
       }
       case 'DELETE': {
         if (recordId) {
-          // 删除单条
           const stmt = env.DB.prepare('DELETE FROM health_records WHERE id = ?');
           await stmt.bind(recordId).run();
           result = { success: true };
         } else {
-          // 删除全部
           const stmt = env.DB.prepare('DELETE FROM health_records');
           await stmt.run();
           result = { success: true };
