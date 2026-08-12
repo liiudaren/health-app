@@ -45,7 +45,7 @@ export async function onRequest(context) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING *
         `);
-        const result = await stmt.bind(
+        const inserted = await stmt.bind(
           record.date, record.hospital, record.doctor, record.purpose || '',
           record.symptomReason || '', record.weight || '', record.other_metric || '',
           record.costRegistration || 0, record.costExam || 0, record.costDrug || 0, record.costTransport || 0,
@@ -53,7 +53,7 @@ export async function onRequest(context) {
           JSON.stringify(record.scheduleDays || []), record.schedulePeriod || '上午',
           JSON.stringify(record.medications || []), JSON.stringify(record.images || [])
         ).first();
-        result = { data: result };
+        const result = { data: inserted };
         break;
       }
       case 'DELETE': {
