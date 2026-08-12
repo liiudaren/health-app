@@ -1012,7 +1012,7 @@
         const currMeds = record.medications || [];
 
         let hasChange = false;
-        if (currMeds.some(m => m.status === '已停用' || m.isNew)) hasChange = true;
+        if (Array.isArray(currMeds) && currMeds.some(m => m.status === '已停用' || m.isNew)) hasChange = true;
         let warningTag = hasChange ? `<span class="tag-warning"><i class="fas fa-exclamation-circle"></i> 用药有调整</span>` : '';
 
         const medDisplayHtml = buildMedicationDisplay(currMeds);
