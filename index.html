@@ -1896,96 +1896,113 @@
     // 保存就诊记录
     // ================================================================
     recordForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      if (!currentUser) { alert('请先登录'); return; }
-      const date=document.getElementById('visitDate').value;
-      const hospital=document.getElementById('hospitalName').value.trim();
-      const doctor=document.getElementById('doctorName').value.trim();
-      const purpose=document.getElementById('examPurpose').value;
-      const symptomReason=document.getElementById('symptomReason').value.trim();
-      const feelings=document.getElementById('feelings').value.trim();
-      const nextVisit=document.getElementById('nextVisitDateInput').value;
-      const metricValue=document.getElementById('metricValue').value.trim();
-      const recordWeight=document.getElementById('recordWeight').value.trim();
-      const scheduleDays = getSelectedScheduleDays();
-      const schedulePeriod = document.getElementById('schedulePeriod').value;
-      const costRegistration=parseFloat(document.getElementById('costRegistration').value) || 0;
-      const costExam=parseFloat(document.getElementById('costExam').value) || 0;
-      const costDrug=parseFloat(document.getElementById('costDrug').value) || 0;
-      const costTransport=parseFloat(document.getElementById('costTransport').value) || 0;
-      const medications = getMedsData();
-      const editId = document.getElementById('editRecordId').value;
+  e.preventDefault();
+  // 防止重复提交
+  if (recordForm.dataset.submitting === 'true') return;
+  recordForm.dataset.submitting = 'true';
 
-      if(!date||!hospital||!doctor){ alert('请填写日期、医院、医生'); return; }
+  if (!currentUser) { alert('请先登录'); recordForm.dataset.submitting = 'false'; return; }
 
-      let compressed = [...existingImages];
-      for (let f of selectedFiles) {
-        if (f.type === 'application/pdf') {
-          try {
-            const arrayBuffer = await f.arrayBuffer();
-            const pdfData = new Uint8Array(arrayBuffer.slice(0));
-            const pages = await renderPDFAllPages(pdfData);
-            if (pages && pages.length>0) {
-              compressed = compressed.concat(pages);
-            } else {
-              const base64 = btoa(String.fromCharCode(...pdfData));
-              compressed.push('PDF:' + base64);
-            }
-          } catch(e) { console.warn('PDF处理失败:', e); }
+  const date = document.getElementById('visitDate').value;
+  const hospital = document.getElementById('hospitalName').value.trim();
+  const doctor = document.getElementById('doctorName').value.trim();
+  const purpose = document.getElementById('examPurpose').value;
+  const symptomReason = document.getElementById('symptomReason').value.trim();
+  const feelings = document.getElementById('feelings').value.trim();
+  const nextVisit = document.getElementById('nextVisitDateInput').value;
+  const metricValue = document.getElementById('metricValue').value.trim();
+  const recordWeight = document.getElementById('recordWeight').value.trim();
+  const scheduleDays = getSelectedScheduleDays();
+  const schedulePeriod = document.getElementById('schedulePeriod').value;
+  const costRegistration = parseFloat(document.getElementById('costRegistration').value) || 0;
+  const costExam = parseFloat(document.getElementById('costExam').value) || 0;
+  const costDrug = parseFloat(document.getElementById('costDrug').value) || 0;
+  const costTransport = parseFloat(document.getElementById('costTransport').value) || 0;
+  const medications = getMedsData();
+  const editId = document.getElementById('editRecordId').value;
+
+  if (!date || !hospital || !doctor) { alert('请填写日期、医院、医生'); recordForm.dataset.submitting = 'false'; return; }
+
+  // 处理图片压缩（保持原有逻辑）
+  let compressed = [...existingImages];
+  for (let f of selectedFiles) {
+    if (f.type === 'application/pdf') {
+      try {
+        const arrayBuffer = await f.arrayBuffer();
+        const pdfData = new Uint8Array(arrayBuffer.slice(0));
+        const pages = await renderPDFAllPages(pdfData);
+        if (pages && pages.length > 0) {
+          compressed = compressed.concat(pages);
         } else {
-          try {
-            const img = await compressImage(f);
-            compressed.push(img);
-          } catch(e) {}
+          const base64 = btoa(String.fromCharCode(...pdfData));
+          compressed.push('PDF:' + base64);
         }
-      }
+      } catch (e) { console.warn('PDF处理失败:', e); }
+    } else {
+      try {
+        const img = await compressImage(f);
+        compressed.push(img);
+      } catch (e) {}
+    }
+  }
 
-      const finalMeds = medications.map(m => ({ ...m, isNew: false }));
+  const finalMeds = medications.map(m => ({ ...m, isNew: false }));
 
-      // 字段名完全匹配数据库
-      const recordData = {
-        date: date,
-        hospital: hospital,
-        doctor: doctor,
-        purpose: purpose,
-        symptom_reason: purpose === '针对性检查' ? symptomReason : '',
-        feelings: feelings,
-        next_visit: nextVisit || null,
-        medications: finalMeds,
-        metric_value: metricValue,
-        record_weight: recordWeight,
-        schedule_days: scheduleDays,
-        schedule_period: schedulePeriod,
-        costRegistration: costRegistration,
-        costExam: costExam,
-        costDrug: costDrug,
-        costTransport: costTransport,
-        images: compressed,
-      };
+  const recordData = {
+    date: date,
+    hospital: hospital,
+    doctor: doctor,
+    purpose: purpose,
+    symptom_reason: purpose === '针对性检查' ? symptomReason : '',
+    feelings: feelings,
+    next_visit: nextVisit || null,
+    medications: finalMeds,
+    metric_value: metricValue,
+    record_weight: recordWeight,
+    schedule_days: scheduleDays,
+    schedule_period: schedulePeriod,
+    costRegistration: costRegistration,
+    costExam: costExam,
+    costDrug: costDrug,
+    costTransport: costTransport,
+    images: compressed,
+  };
 
-      let success = false;
-      if (editId) {
-        const oldRecord = allRecords.find(r => r.id === editId);
-        if (oldRecord) {
-          const oldNames = new Set((oldRecord.medications || []).map(m => m.name));
-          finalMeds.forEach(m => {
-            if (!oldNames.has(m.name)) m.isNew = true;
-          });
-        }
-        recordData.id = editId;
-        success = await updateRecordInCloud(editId, recordData);
-      } else {
-        finalMeds.forEach(m => m.isNew = true);
-        success = await addRecordToCloud(recordData);
+  let success = false;
+  try {
+    if (editId) {
+      const oldRecord = allRecords.find(r => r.id === editId);
+      if (oldRecord) {
+        const oldNames = new Set((oldRecord.medications || []).map(m => m.name));
+        finalMeds.forEach(m => {
+          if (!oldNames.has(m.name)) m.isNew = true;
+        });
       }
-      if (success) {
-        showSaveFeedback('✅ 保存成功');
-        clearDraft();
-        modalOverlay.classList.remove('active');
-        renderTimeline();
-        renderMedHistory();
-      }
-    });
+      recordData.id = editId;
+      success = await updateRecordInCloud(editId, recordData);
+    } else {
+      finalMeds.forEach(m => m.isNew = true);
+      success = await addRecordToCloud(recordData);
+    }
+  } catch (error) {
+    console.error('保存出错:', error);
+    alert('保存失败，请重试');
+    recordForm.dataset.submitting = 'false';
+    return;
+  }
+
+  recordForm.dataset.submitting = 'false';
+
+  if (success) {
+    showSaveFeedback('✅ 保存成功');
+    clearDraft();
+    modalOverlay.classList.remove('active');
+    // 清空表单，重置状态
+    resetModal();
+    // 重新加载数据以刷新列表
+    await loadAllData();
+  }
+});
 
     // ================================================================
     // 其他功能
