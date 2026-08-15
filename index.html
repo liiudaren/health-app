@@ -8,7 +8,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    /* ===== 全部样式（与你原始文件一致，只增补登录按钮样式） ===== */
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: #f8faff;
@@ -569,7 +568,7 @@
 
 <script>
   // ================================================================
-  // 1. Supabase 配置（你的项目信息）
+  // 1. Supabase 配置
   // ================================================================
   const SUPABASE_URL = 'https://nveukkhvccpgjibbzbfr.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_i4fNz1islrenC3EQ5aOIJA_VMCcZYma';
@@ -737,12 +736,11 @@
     }
 
     // ================================================================
-    // Records CRUD（字段名已全部改为下划线格式）
+    // Records CRUD
     // ================================================================
     async function addRecordToCloud(recordData) {
       if (!currentUser) return false;
       recordData.user_id = currentUser.id;
-      // 将数组/对象转为 JSON 字符串存储
       if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
       if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
       if (recordData.images) recordData.images = JSON.stringify(recordData.images);
@@ -756,13 +754,13 @@
         alert('保存失败：' + error.message);
         return false;
       }
-      // 从数据库返回的数据中，JSON 字段是字符串，需要解析
-      const newRecord = data[0];
-      if (newRecord.medications) newRecord.medications = JSON.parse(newRecord.medications);
-      if (newRecord.schedule_days) newRecord.schedule_days = JSON.parse(newRecord.schedule_days);
-      if (newRecord.images) newRecord.images = JSON.parse(newRecord.images);
-      
-      allRecords = [newRecord, ...allRecords];
+      if (data && data.length > 0) {
+        allRecords = [data[0], ...allRecords.filter(r => r.id !== data[0].id)];
+      } else {
+        // 如果没返回数据，重新加载
+        await loadAllData();
+        return true;
+      }
       renderTimeline();
       return true;
     }
@@ -784,13 +782,13 @@
         alert('更新失败：' + error.message);
         return false;
       }
-      const updatedRecord = data[0];
-      if (updatedRecord.medications) updatedRecord.medications = JSON.parse(updatedRecord.medications);
-      if (updatedRecord.schedule_days) updatedRecord.schedule_days = JSON.parse(updatedRecord.schedule_days);
-      if (updatedRecord.images) updatedRecord.images = JSON.parse(updatedRecord.images);
-
-      const idx = allRecords.findIndex(r => r.id === id);
-      if (idx !== -1) allRecords[idx] = updatedRecord;
+      if (data && data.length > 0) {
+        const idx = allRecords.findIndex(r => r.id === id);
+        if (idx !== -1) allRecords[idx] = data[0];
+      } else {
+        await loadAllData();
+        return true;
+      }
       renderTimeline();
       return true;
     }
@@ -826,7 +824,12 @@
         alert('指标保存失败：' + error.message);
         return false;
       }
-      allMetrics = [data[0], ...allMetrics];
+      if (data && data.length > 0) {
+        allMetrics = [data[0], ...allMetrics.filter(m => m.id !== data[0].id)];
+      } else {
+        await loadAllData();
+        return true;
+      }
       renderMetrics();
       return true;
     }
@@ -848,7 +851,7 @@
     }
 
     // ================================================================
-    // 渲染函数（关键：解析 JSON 字段）
+    // 渲染函数 - 使用事件委托解决动态绑定问题
     // ================================================================
     function renderTimeline() {
       const container = document.getElementById('timelineContainer');
@@ -872,32 +875,9 @@
         `;
       }
 
-      // 对每条记录，确保 medications, schedule_days, images 被解析为数组
-      const processedRecords = allRecords.map(r => {
-        let meds = r.medications;
-        if (typeof meds === 'string') {
-          try { meds = JSON.parse(meds); } catch(e) { meds = []; }
-        }
-        if (!Array.isArray(meds)) meds = [];
-
-        let schedDays = r.schedule_days;
-        if (typeof schedDays === 'string') {
-          try { schedDays = JSON.parse(schedDays); } catch(e) { schedDays = []; }
-        }
-        if (!Array.isArray(schedDays)) schedDays = [];
-
-        let imgs = r.images;
-        if (typeof imgs === 'string') {
-          try { imgs = JSON.parse(imgs); } catch(e) { imgs = []; }
-        }
-        if (!Array.isArray(imgs)) imgs = [];
-
-        return { ...r, medications: meds, schedule_days: schedDays, images: imgs };
-      });
-
-      let filtered = processedRecords;
+      let filtered = allRecords;
       if (searchVal) {
-        filtered = processedRecords.filter(r => {
+        filtered = allRecords.filter(r => {
           const hospital = (r.hospital||'').toLowerCase();
           const doctor = (r.doctor||'').toLowerCase();
           const meds = (r.medications||[]).map(m=>m.name||'').join(' ').toLowerCase();
@@ -919,9 +899,11 @@
 
       sorted.forEach((record) => {
         const currMeds = record.medications || [];
-        let hasChange = currMeds.some(m => m.status === '已停用' || m.isNew);
+        // 确保 currMeds 是数组
+        const medsArray = Array.isArray(currMeds) ? currMeds : [];
+        let hasChange = medsArray.some(m => m.status === '已停用' || m.isNew);
         let warningTag = hasChange ? `<span class="tag-warning"><i class="fas fa-exclamation-circle"></i> 用药有调整</span>` : '';
-        const medDisplayHtml = buildMedicationDisplay(currMeds);
+        const medDisplayHtml = buildMedicationDisplay(medsArray);
 
         let symptomHtml = '';
         if(record.purpose==='针对性检查' && record.symptom_reason) {
@@ -998,16 +980,43 @@
       updateCountdown();
       updateCheckinUI();
       applyPrivacy();
-
-      document.querySelectorAll('.view-images-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openViewer(this.dataset.id); }));
-      document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openEditModal(this.dataset.id); }));
-      document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); 
-        if (confirm('确定要删除这条记录吗？')) {
-          deleteRecordFromCloud(this.dataset.id);
-        }
-      }));
     }
 
+    // ================================================================
+    // 事件委托 - 统一处理按钮点击（解决动态绑定失效问题）
+    // ================================================================
+    document.getElementById('timelineContainer').addEventListener('click', function(e) {
+      const target = e.target.closest('button');
+      if (!target) return;
+
+      // 查看图片
+      if (target.classList.contains('view-images-btn')) {
+        e.stopPropagation();
+        const id = target.dataset.id;
+        openViewer(id);
+        return;
+      }
+
+      // 编辑
+      if (target.classList.contains('edit-btn')) {
+        e.stopPropagation();
+        const id = target.dataset.id;
+        openEditModal(id);
+        return;
+      }
+
+      // 删除
+      if (target.classList.contains('delete-btn')) {
+        e.stopPropagation();
+        const id = target.dataset.id;
+        if (confirm('确定要删除这条记录吗？')) {
+          deleteRecordFromCloud(id);
+        }
+        return;
+      }
+    });
+
+    // 辅助函数
     function getPrevRecord(records, id) {
       const sorted=[...records].sort((a,b)=> new Date(b.date) - new Date(a.date));
       const idx=sorted.findIndex(r=>r.id===id);
@@ -1026,12 +1035,13 @@
       return weekdays[d.getDay()];
     }
     function buildMedicationDisplay(currMeds) {
-      if (!currMeds || currMeds.length === 0) {
+      const meds = Array.isArray(currMeds) ? currMeds : [];
+      if (meds.length === 0) {
         return '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
       }
-      const taking = currMeds.filter(m => m.status === '服用中' || !m.status);
-      const stopped = currMeds.filter(m => m.status === '已停用');
-      const temp = currMeds.filter(m => m.status === '临时用药');
+      const taking = meds.filter(m => m.status === '服用中' || !m.status);
+      const stopped = meds.filter(m => m.status === '已停用');
+      const temp = meds.filter(m => m.status === '临时用药');
       let html = '';
       if (taking.length > 0) {
         html += `<div class="med-section"><div class="med-label">💊 长期用药</div><div class="med-tags">`;
@@ -1260,16 +1270,13 @@
       }
       const medMap = {};
       allRecords.forEach(r => {
-        let meds = r.medications;
-        if (typeof meds === 'string') {
-          try { meds = JSON.parse(meds); } catch(e) { meds = []; }
+        if (r.medications && r.medications.length) {
+          r.medications.forEach(m => {
+            const key = m.name || '未知药品';
+            if (!medMap[key]) medMap[key] = [];
+            medMap[key].push({ date: r.date, med: m });
+          });
         }
-        if (!Array.isArray(meds)) meds = [];
-        meds.forEach(m => {
-          const key = m.name || '未知药品';
-          if (!medMap[key]) medMap[key] = [];
-          medMap[key].push({ date: r.date, med: m });
-        });
       });
       let html = '';
       for (const [name, entries] of Object.entries(medMap)) {
@@ -1418,26 +1425,20 @@
     function getHistoricalDrugNames() {
       const names = new Set();
       allRecords.forEach(r => {
-        let meds = r.medications;
-        if (typeof meds === 'string') {
-          try { meds = JSON.parse(meds); } catch(e) { meds = []; }
+        if (r.medications) {
+          r.medications.forEach(m => { if (m.name) names.add(m.name); });
         }
-        if (!Array.isArray(meds)) meds = [];
-        meds.forEach(m => { if (m.name) names.add(m.name); });
       });
       return Array.from(names).sort();
     }
     function getDrugHistory(name) {
       const sorted = [...allRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
       for (let r of sorted) {
-        let meds = r.medications;
-        if (typeof meds === 'string') {
-          try { meds = JSON.parse(meds); } catch(e) { meds = []; }
-        }
-        if (!Array.isArray(meds)) meds = [];
-        for (let m of meds) {
-          if (m.name === name) {
-            return { spec: m.spec || '', usage: m.usage || '', longTerm: !!m.longTerm };
+        if (r.medications) {
+          for (let m of r.medications) {
+            if (m.name === name) {
+              return { spec: m.spec || '', usage: m.usage || '', longTerm: !!m.longTerm };
+            }
           }
         }
       }
@@ -1539,23 +1540,6 @@
     function openEditModal(id) {
       const r = allRecords.find(x => x.id === id);
       if (!r) return;
-      // 解析 JSON 字段
-      let meds = r.medications;
-      if (typeof meds === 'string') {
-        try { meds = JSON.parse(meds); } catch(e) { meds = []; }
-      }
-      if (!Array.isArray(meds)) meds = [];
-      let schedDays = r.schedule_days;
-      if (typeof schedDays === 'string') {
-        try { schedDays = JSON.parse(schedDays); } catch(e) { schedDays = []; }
-      }
-      if (!Array.isArray(schedDays)) schedDays = [];
-      let imgs = r.images;
-      if (typeof imgs === 'string') {
-        try { imgs = JSON.parse(imgs); } catch(e) { imgs = []; }
-      }
-      if (!Array.isArray(imgs)) imgs = [];
-
       resetModal();
       editIdInput.value = id;
       modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
@@ -1563,9 +1547,9 @@
       document.getElementById('hospitalName').value = r.hospital || '';
       document.getElementById('doctorName').value = r.doctor || '';
       document.getElementById('examPurpose').value = r.purpose || '常规复查';
-      if (schedDays && schedDays.length > 0) {
+      if (r.schedule_days && r.schedule_days.length > 0) {
         document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
-          cb.checked = schedDays.includes(cb.value);
+          cb.checked = r.schedule_days.includes(cb.value);
         });
       }
       document.getElementById('schedulePeriod').value = r.schedule_period || '上午';
@@ -1582,9 +1566,9 @@
       document.getElementById('costDrug').value = r.costDrug || 0;
       document.getElementById('costTransport').value = r.costTransport || 0;
       updateCostTotal();
-      if (meds && meds.length > 0) {
+      if (r.medications && r.medications.length > 0) {
         medicationGroup.innerHTML = '';
-        meds.forEach((m, idx) => {
+        r.medications.forEach((m, idx) => {
           const status = m.status || '服用中';
           if (idx === 0) {
             const row = document.createElement('div'); 
@@ -1630,7 +1614,7 @@
         });
         updateRemoveBtns();
       }
-      existingImages = imgs || [];
+      existingImages = r.images || [];
       renderPreview();
       initAllNameSuggestions();
       modalOverlay.classList.add('active');
@@ -1806,7 +1790,9 @@
       autoSaveDraft();
     });
 
-    // 文件上传
+    // ================================================================
+    // 文件上传（修复 PDF 的 ArrayBuffer 分离问题）
+    // ================================================================
     const dropArea=document.getElementById('dropArea'), fileInput=document.getElementById('fileInput');
     async function handleFiles(files) {
       for (let f of files) {
@@ -1814,12 +1800,11 @@
           selectedFiles.push(f);
           try {
             const arrayBuffer = await f.arrayBuffer();
-            const pdfData = new Uint8Array(arrayBuffer);
-            // 因为 PDF.js 需要保留 ArrayBuffer，所以不能 detach，这里我们复制一份
-            const pdfDataCopy = new Uint8Array(pdfData);
-            const img = await renderPDFToImage(pdfDataCopy, 1);
+            // 复制一份 ArrayBuffer，避免被分离
+            const pdfData = new Uint8Array(arrayBuffer.slice(0));
+            const img = await renderPDFToImage(pdfData, 1);
             if (img) {
-              pendingPDFs.push({ data: pdfDataCopy, pages: 0 });
+              pendingPDFs.push({ data: pdfData, pages: 0 });
               existingImages.push(img);
             } else {
               selectedFiles.push(f);
@@ -1900,7 +1885,7 @@
     }
 
     // ================================================================
-    // 保存就诊记录（关键：字段名匹配数据库，日期空值处理）
+    // 保存就诊记录
     // ================================================================
     recordForm.addEventListener('submit', async (e)=>{
       e.preventDefault();
@@ -1930,7 +1915,7 @@
         if (f.type === 'application/pdf') {
           try {
             const arrayBuffer = await f.arrayBuffer();
-            const pdfData = new Uint8Array(arrayBuffer);
+            const pdfData = new Uint8Array(arrayBuffer.slice(0));
             const pages = await renderPDFAllPages(pdfData);
             if (pages && pages.length>0) {
               compressed = compressed.concat(pages);
@@ -1949,7 +1934,7 @@
 
       const finalMeds = medications.map(m => ({ ...m, isNew: false }));
 
-      // 关键：字段名全部改为数据库列名（下划线），并且空字符串转为 null
+      // 字段名完全匹配数据库
       const recordData = {
         date: date,
         hospital: hospital,
@@ -1957,7 +1942,7 @@
         purpose: purpose,
         symptom_reason: purpose === '针对性检查' ? symptomReason : '',
         feelings: feelings,
-        next_visit: nextVisit || null,   // 空字符串转为 null
+        next_visit: nextVisit || null,
         medications: finalMeds,
         metric_value: metricValue,
         record_weight: recordWeight,
@@ -1974,12 +1959,7 @@
       if (editId) {
         const oldRecord = allRecords.find(r => r.id === editId);
         if (oldRecord) {
-          let oldMeds = oldRecord.medications;
-          if (typeof oldMeds === 'string') {
-            try { oldMeds = JSON.parse(oldMeds); } catch(e) { oldMeds = []; }
-          }
-          if (!Array.isArray(oldMeds)) oldMeds = [];
-          const oldNames = new Set(oldMeds.map(m => m.name));
+          const oldNames = new Set((oldRecord.medications || []).map(m => m.name));
           finalMeds.forEach(m => {
             if (!oldNames.has(m.name)) m.isNew = true;
           });
