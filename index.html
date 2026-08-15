@@ -6,9 +6,10 @@
   <title>🌱 个人健康档案 · 云端版</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 首先尝试常规加载 Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    /* ===== 全部样式（与你原始文件完全一致，只增补了登录按钮样式） ===== */
+    /* ===== 完全保留你的原始样式，只增加登录相关样式 ===== */
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: #f8faff;
@@ -576,1067 +577,974 @@
   // ================================================================
   const SUPABASE_URL = 'https://nveukkhvccpgjibzbzfr.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_i4fNz1islrenC3EQ5aOIJA_VMCcZYma';
-  // 声明 supabase 实例（只声明一次）
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ================================================================
-  // 2. 全局状态
+  // 2. 等待 Supabase SDK 加载完成再启动
   // ================================================================
-  let currentUser = null;
-  let allRecords = [];
-  let allMetrics = [];
-  let selectedFiles = [];
-  let existingImages = [];
-  let pendingPDFs = [];
-
-  // ================================================================
-  // 3. 辅助函数（与原来完全一致）
-  // ================================================================
-  const PRIVACY_KEY = 'privacyMode_v1';
-  const BASE_HEIGHT_KEY = 'baseHeight_v1';
-  const DRAFT_KEY = 'recordDraft_v1';
-
-  function loadPrivacy() { return localStorage.getItem(PRIVACY_KEY) === 'true'; }
-  function savePrivacy(v) { localStorage.setItem(PRIVACY_KEY, String(v)); }
-  function getBaseHeight() { return parseFloat(localStorage.getItem(BASE_HEIGHT_KEY)) || null; }
-  function setBaseHeight(h) { localStorage.setItem(BASE_HEIGHT_KEY, String(h)); }
-  function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || null; } catch(e){ return null; } }
-  function saveDraft(d) { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }
-  function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
-
-  function showSaveFeedback(msg, isSuccess = true) {
-    const el = document.getElementById('saveFeedback');
-    el.textContent = msg;
-    el.style.display = 'block';
-    el.style.color = isSuccess ? '#1f6b4a' : '#b45f1a';
-    el.style.background = isSuccess ? '#e6f5e9' : '#fff4e5';
-    setTimeout(() => { el.style.display = 'none'; }, 3000);
-  }
-
-  // ================================================================
-  // 4. 认证相关
-  // ================================================================
-  const authModal = document.getElementById('authModal');
-  const authForm = document.getElementById('authForm');
-  const authEmail = document.getElementById('authEmail');
-  const authPassword = document.getElementById('authPassword');
-  const authError = document.getElementById('authError');
-  const authSwitchBtn = document.getElementById('authSwitchBtn');
-  const authSubmitBtn = document.getElementById('authSubmitBtn');
-  const authModalTitle = document.getElementById('authModalTitle');
-  const loginBtn = document.getElementById('loginBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
-  const userEmailDisplay = document.getElementById('userEmailDisplay');
-  let isLoginMode = true;
-
-  async function checkSession() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      currentUser = session.user;
-      userEmailDisplay.textContent = currentUser.email;
-      loginBtn.style.display = 'none';
-      logoutBtn.style.display = 'inline-block';
-      await loadAllData();
-    } else {
-      currentUser = null;
-      userEmailDisplay.textContent = '未登录';
-      loginBtn.style.display = 'inline-block';
-      logoutBtn.style.display = 'none';
-      allRecords = [];
-      allMetrics = [];
-      document.getElementById('timelineContainer').innerHTML = '<div class="empty-message">请先登录以查看您的健康档案</div>';
-      document.getElementById('recordCount').textContent = '0 条记录';
-      renderMetrics();
+  function waitForSupabase(callback, retries) {
+    if (typeof window.supabase !== 'undefined') {
+      callback();
+      return;
     }
+    if (retries === undefined) retries = 10;
+    if (retries <= 0) {
+      alert('Supabase SDK 加载失败，请刷新页面或检查网络。');
+      return;
+    }
+    setTimeout(function() {
+      waitForSupabase(callback, retries - 1);
+    }, 300);
   }
 
-  loginBtn.addEventListener('click', () => {
-    authModal.classList.add('active');
-    authError.textContent = '';
-    isLoginMode = true;
-    authModalTitle.innerHTML = '<i class="fas fa-lock"></i> 登录';
-    authSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> 登录';
-    authSwitchBtn.textContent = '切换到注册';
-  });
+  // ================================================================
+  // 3. 启动应用
+  // ================================================================
+  function startApp() {
+    // 创建 Supabase 客户端实例（全局）
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // 挂载到 window 方便调试
+    window.__supabase = supabase;
 
-  authSwitchBtn.addEventListener('click', () => {
-    isLoginMode = !isLoginMode;
-    authModalTitle.innerHTML = isLoginMode ? '<i class="fas fa-lock"></i> 登录' : '<i class="fas fa-user-plus"></i> 注册';
-    authSubmitBtn.innerHTML = isLoginMode ? '<i class="fas fa-sign-in-alt"></i> 登录' : '<i class="fas fa-user-plus"></i> 注册';
-    authSwitchBtn.textContent = isLoginMode ? '切换到注册' : '切换到登录';
-    authError.textContent = '';
-  });
+    // ================================================================
+    // 4. 全局状态
+    // ================================================================
+    let currentUser = null;
+    let allRecords = [];
+    let allMetrics = [];
+    let selectedFiles = [];
+    let existingImages = [];
+    let pendingPDFs = [];
 
-  authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = authEmail.value.trim();
-    const password = authPassword.value.trim();
-    if (!email || !password) { authError.textContent = '请填写完整'; return; }
-    try {
-      if (isLoginMode) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+    // ================================================================
+    // 5. 辅助函数
+    // ================================================================
+    const PRIVACY_KEY = 'privacyMode_v1';
+    const BASE_HEIGHT_KEY = 'baseHeight_v1';
+    const DRAFT_KEY = 'recordDraft_v1';
+
+    function loadPrivacy() { return localStorage.getItem(PRIVACY_KEY) === 'true'; }
+    function savePrivacy(v) { localStorage.setItem(PRIVACY_KEY, String(v)); }
+    function getBaseHeight() { return parseFloat(localStorage.getItem(BASE_HEIGHT_KEY)) || null; }
+    function setBaseHeight(h) { localStorage.setItem(BASE_HEIGHT_KEY, String(h)); }
+    function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || null; } catch(e){ return null; } }
+    function saveDraft(d) { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }
+    function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
+
+    function showSaveFeedback(msg, isSuccess = true) {
+      const el = document.getElementById('saveFeedback');
+      el.textContent = msg;
+      el.style.display = 'block';
+      el.style.color = isSuccess ? '#1f6b4a' : '#b45f1a';
+      el.style.background = isSuccess ? '#e6f5e9' : '#fff4e5';
+      setTimeout(() => { el.style.display = 'none'; }, 3000);
+    }
+
+    // ================================================================
+    // 6. 认证相关
+    // ================================================================
+    const authModal = document.getElementById('authModal');
+    const authForm = document.getElementById('authForm');
+    const authEmail = document.getElementById('authEmail');
+    const authPassword = document.getElementById('authPassword');
+    const authError = document.getElementById('authError');
+    const authSwitchBtn = document.getElementById('authSwitchBtn');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authModalTitle = document.getElementById('authModalTitle');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const userEmailDisplay = document.getElementById('userEmailDisplay');
+    let isLoginMode = true;
+
+    async function checkSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        currentUser = session.user;
+        userEmailDisplay.textContent = currentUser.email;
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+        await loadAllData();
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        authError.textContent = '✅ 注册成功，请登录';
-        isLoginMode = true;
-        authModalTitle.innerHTML = '<i class="fas fa-lock"></i> 登录';
-        authSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> 登录';
-        authSwitchBtn.textContent = '切换到注册';
-        authPassword.value = '';
+        currentUser = null;
+        userEmailDisplay.textContent = '未登录';
+        loginBtn.style.display = 'inline-block';
+        logoutBtn.style.display = 'none';
+        allRecords = [];
+        allMetrics = [];
+        document.getElementById('timelineContainer').innerHTML = '<div class="empty-message">请先登录以查看您的健康档案</div>';
+        document.getElementById('recordCount').textContent = '0 条记录';
+        renderMetrics();
+        updateCountdown();
+        updateCheckinUI();
+      }
+    }
+
+    loginBtn.addEventListener('click', () => {
+      authModal.classList.add('active');
+      authError.textContent = '';
+      isLoginMode = true;
+      authModalTitle.innerHTML = '<i class="fas fa-lock"></i> 登录';
+      authSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> 登录';
+      authSwitchBtn.textContent = '切换到注册';
+    });
+
+    authSwitchBtn.addEventListener('click', () => {
+      isLoginMode = !isLoginMode;
+      authModalTitle.innerHTML = isLoginMode ? '<i class="fas fa-lock"></i> 登录' : '<i class="fas fa-user-plus"></i> 注册';
+      authSubmitBtn.innerHTML = isLoginMode ? '<i class="fas fa-sign-in-alt"></i> 登录' : '<i class="fas fa-user-plus"></i> 注册';
+      authSwitchBtn.textContent = isLoginMode ? '切换到注册' : '切换到登录';
+      authError.textContent = '';
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = authEmail.value.trim();
+      const password = authPassword.value.trim();
+      if (!email || !password) { authError.textContent = '请填写完整'; return; }
+      try {
+        if (isLoginMode) {
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.auth.signUp({ email, password });
+          if (error) throw error;
+          authError.textContent = '✅ 注册成功，请登录';
+          isLoginMode = true;
+          authModalTitle.innerHTML = '<i class="fas fa-lock"></i> 登录';
+          authSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> 登录';
+          authSwitchBtn.textContent = '切换到注册';
+          authPassword.value = '';
+          return;
+        }
+        authModal.classList.remove('active');
+        checkSession();
+      } catch (err) {
+        authError.textContent = '❌ ' + (err.message || '操作失败');
+      }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      checkSession();
+    });
+
+    // ================================================================
+    // 7. 数据加载（从 Supabase）
+    // ================================================================
+    async function loadAllData() {
+      if (!currentUser) return;
+      // 加载就诊记录
+      const { data: recs, error: recErr } = await supabase
+        .from('records')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('date', { ascending: false });
+      if (recErr) console.error('加载记录失败:', recErr);
+      else allRecords = recs || [];
+
+      // 加载指标
+      const { data: metricsData, error: metErr } = await supabase
+        .from('metrics')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('date', { ascending: false });
+      if (metErr) console.error('加载指标失败:', metErr);
+      else allMetrics = metricsData || [];
+
+      renderTimeline();
+      renderMetrics();
+      updateCountdown();
+      updateCheckinUI();
+    }
+
+    // ================================================================
+    // 8. Records CRUD
+    // ================================================================
+    async function addRecordToCloud(recordData) {
+      if (!currentUser) return false;
+      recordData.user_id = currentUser.id;
+      if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
+      if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
+      if (recordData.images) recordData.images = JSON.stringify(recordData.images);
+
+      const { data, error } = await supabase
+        .from('records')
+        .insert([recordData])
+        .select();
+      if (error) {
+        console.error('新增失败:', error);
+        alert('保存失败：' + error.message);
+        return false;
+      }
+      allRecords = [data[0], ...allRecords];
+      renderTimeline();
+      return true;
+    }
+
+    async function updateRecordInCloud(id, updates) {
+      if (!currentUser) return false;
+      if (updates.medications) updates.medications = JSON.stringify(updates.medications);
+      if (updates.schedule_days) updates.schedule_days = JSON.stringify(updates.schedule_days);
+      if (updates.images) updates.images = JSON.stringify(updates.images);
+
+      const { data, error } = await supabase
+        .from('records')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', currentUser.id)
+        .select();
+      if (error) {
+        console.error('更新失败:', error);
+        alert('更新失败：' + error.message);
+        return false;
+      }
+      const idx = allRecords.findIndex(r => r.id === id);
+      if (idx !== -1) allRecords[idx] = data[0];
+      renderTimeline();
+      return true;
+    }
+
+    async function deleteRecordFromCloud(id) {
+      if (!currentUser) return false;
+      const { error } = await supabase
+        .from('records')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', currentUser.id);
+      if (error) {
+        alert('删除失败：' + error.message);
+        return false;
+      }
+      allRecords = allRecords.filter(r => r.id !== id);
+      renderTimeline();
+      return true;
+    }
+
+    // ================================================================
+    // 9. Metrics CRUD
+    // ================================================================
+    async function addMetricToCloud(metric) {
+      if (!currentUser) return false;
+      metric.user_id = currentUser.id;
+      const { data, error } = await supabase
+        .from('metrics')
+        .insert([metric])
+        .select();
+      if (error) {
+        console.error('指标保存失败:', error);
+        alert('指标保存失败：' + error.message);
+        return false;
+      }
+      allMetrics = [data[0], ...allMetrics];
+      renderMetrics();
+      return true;
+    }
+
+    async function deleteMetricFromCloud(id) {
+      if (!currentUser) return false;
+      const { error } = await supabase
+        .from('metrics')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', currentUser.id);
+      if (error) {
+        alert('删除指标失败：' + error.message);
+        return false;
+      }
+      allMetrics = allMetrics.filter(m => m.id !== id);
+      renderMetrics();
+      return true;
+    }
+
+    // ================================================================
+    // 10. 渲染函数（Timeline）
+    // ================================================================
+    function renderTimeline() {
+      const container = document.getElementById('timelineContainer');
+      const countSpan = document.getElementById('recordCount');
+      const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+      const privacyOn = loadPrivacy();
+      document.getElementById('viewerOverlay').classList.toggle('privacy-on', privacyOn);
+
+      const checkinData = getCheckinData();
+      const hasAnyCheckin = checkinData.morning.checked || checkinData.afternoon.checked || checkinData.evening.checked;
+      let checkinCardHtml = '';
+      if (hasAnyCheckin) {
+        const parts = [];
+        if (checkinData.morning.checked) parts.push(`☀️ 早上 ✅ ${checkinData.morning.time}`);
+        if (checkinData.afternoon.checked) parts.push(`🌤 下午 ✅ ${checkinData.afternoon.time}`);
+        if (checkinData.evening.checked) parts.push(`🌙 晚上 ✅ ${checkinData.evening.time}`);
+        checkinCardHtml = `
+          <div class="record-card checkin-card">
+            <div class="card-top"><div class="card-left"><div class="date"><i class="fas fa-check-circle" style="color:#1f8b5a;"></i> 📅 今日服药记录 · ${parts.join(' · ')}</div></div></div>
+          </div>
+        `;
+      }
+
+      let filtered = allRecords;
+      if (searchVal) {
+        filtered = allRecords.filter(r => {
+          const hospital = (r.hospital||'').toLowerCase();
+          const doctor = (r.doctor||'').toLowerCase();
+          const meds = (r.medications||[]).map(m=>m.name||'').join(' ').toLowerCase();
+          return hospital.includes(searchVal) || doctor.includes(searchVal) || meds.includes(searchVal);
+        });
+      }
+
+      if (filtered.length === 0 && !hasAnyCheckin) {
+        container.innerHTML = `<div class="empty-message"><i class="far fa-smile" style="font-size:2rem; display:block; margin-bottom:8px;"></i> 没有记录，开始添加吧 🌱</div>`;
+        countSpan.textContent = allRecords.length + ' 条记录';
+        updateCountdown();
+        updateCheckinUI();
+        applyPrivacy();
         return;
       }
-      authModal.classList.remove('active');
-      checkSession();
-    } catch (err) {
-      authError.textContent = '❌ ' + (err.message || '操作失败');
-    }
-  });
 
-  logoutBtn.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    checkSession();
-  });
+      const sorted = [...filtered].sort((a,b)=> a.date < b.date ? 1 : -1);
+      let html = checkinCardHtml;
 
-  // ================================================================
-  // 5. 数据加载
-  // ================================================================
-  async function loadAllData() {
-    if (!currentUser) return;
-    // 加载就诊记录
-    const { data: recs, error: recErr } = await supabase
-      .from('records')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('date', { ascending: false });
-    if (recErr) console.error('加载记录失败:', recErr);
-    else allRecords = recs || [];
+      sorted.forEach((record) => {
+        const currMeds = record.medications || [];
+        let hasChange = currMeds.some(m => m.status === '已停用' || m.isNew);
+        let warningTag = hasChange ? `<span class="tag-warning"><i class="fas fa-exclamation-circle"></i> 用药有调整</span>` : '';
+        const medDisplayHtml = buildMedicationDisplay(currMeds);
 
-    // 加载指标
-    const { data: metricsData, error: metErr } = await supabase
-      .from('metrics')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('date', { ascending: false });
-    if (metErr) console.error('加载指标失败:', metErr);
-    else allMetrics = metricsData || [];
+        let symptomHtml = '';
+        if(record.purpose==='针对性检查' && record.symptomReason) {
+          symptomHtml = `<div style="font-size:0.85rem; color:#3e6b8a; margin-top:2px;"><i class="fas fa-stethoscope"></i> ${record.symptomReason}</div>`;
+        }
 
-    renderTimeline();
-    renderMetrics();
-    updateCountdown();
-    updateCheckinUI();
-  }
+        const imgCount = (record.images||[]).length;
+        const viewBtn = imgCount>0 ? `<button class="btn-sm view-images-btn" data-id="${record.id}"><i class="fas fa-images"></i> 查看图片 (${imgCount})</button>` : `<span style="color:#b0c8dd;font-size:0.8rem;"><i class="far fa-image"></i> 无图片</span>`;
 
-  // ================================================================
-  // 6. Records CRUD
-  // ================================================================
-  async function addRecordToCloud(recordData) {
-    if (!currentUser) return false;
-    recordData.user_id = currentUser.id;
-    if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
-    if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
-    if (recordData.images) recordData.images = JSON.stringify(recordData.images);
+        let metricHtml = '';
+        if(record.metricValue) metricHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-chart-line"></i> 指标: ${record.metricValue}</div>`;
+        let weightHtml = '';
+        if(record.recordWeight) weightHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-weight"></i> 体重: ${record.recordWeight} kg</div>`;
 
-    const { data, error } = await supabase
-      .from('records')
-      .insert([recordData])
-      .select();
-    if (error) {
-      console.error('新增失败:', error);
-      alert('保存失败：' + error.message);
-      return false;
-    }
-    allRecords = [data[0], ...allRecords];
-    renderTimeline();
-    return true;
-  }
+        let intervalText = '';
+        const prevRec = getPrevRecord(allRecords, record.id);
+        if (prevRec) {
+          const d1 = new Date(prevRec.date);
+          const d2 = new Date(record.date);
+          const diff = Math.floor((d2 - d1) / (1000*60*60*24));
+          intervalText = `距离上次就诊已过 ${diff} 天`;
+        } else {
+          intervalText = '首次记录';
+        }
 
-  async function updateRecordInCloud(id, updates) {
-    if (!currentUser) return false;
-    if (updates.medications) updates.medications = JSON.stringify(updates.medications);
-    if (updates.schedule_days) updates.schedule_days = JSON.stringify(updates.schedule_days);
-    if (updates.images) updates.images = JSON.stringify(updates.images);
+        let scheduleHtml = '';
+        if (record.scheduleDays && record.scheduleDays.length>0) {
+          const daysStr = record.scheduleDays.join('、');
+          const period = record.schedulePeriod || '上午';
+          scheduleHtml = `<div style="font-size:0.8rem; color:#2d6b8f;"><i class="far fa-clock"></i> 出诊时间：${daysStr} ${period}</div>`;
+          if (record.nextVisit) {
+            const match = checkScheduleMatch(record);
+            if (match) {
+              scheduleHtml += `<div style="font-size:0.8rem; color:${match.includes('✅')?'#1f8b5a':'#b45f1a'};">${match}</div>`;
+            }
+          }
+        }
 
-    const { data, error } = await supabase
-      .from('records')
-      .update(updates)
-      .eq('id', id)
-      .eq('user_id', currentUser.id)
-      .select();
-    if (error) {
-      console.error('更新失败:', error);
-      alert('更新失败：' + error.message);
-      return false;
-    }
-    const idx = allRecords.findIndex(r => r.id === id);
-    if (idx !== -1) allRecords[idx] = data[0];
-    renderTimeline();
-    return true;
-  }
+        let costHtml = '';
+        const total = (record.costRegistration||0) + (record.costExam||0) + (record.costDrug||0) + (record.costTransport||0);
+        if (total > 0) {
+          costHtml = `<span class="cost-summary">💰 合计：${total.toFixed(2)} 元</span>`;
+        }
 
-  async function deleteRecordFromCloud(id) {
-    if (!currentUser) return false;
-    const { error } = await supabase
-      .from('records')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', currentUser.id);
-    if (error) {
-      alert('删除失败：' + error.message);
-      return false;
-    }
-    allRecords = allRecords.filter(r => r.id !== id);
-    renderTimeline();
-    return true;
-  }
-
-  // ================================================================
-  // 7. Metrics CRUD
-  // ================================================================
-  async function addMetricToCloud(metric) {
-    if (!currentUser) return false;
-    metric.user_id = currentUser.id;
-    const { data, error } = await supabase
-      .from('metrics')
-      .insert([metric])
-      .select();
-    if (error) {
-      console.error('指标保存失败:', error);
-      alert('指标保存失败：' + error.message);
-      return false;
-    }
-    allMetrics = [data[0], ...allMetrics];
-    renderMetrics();
-    return true;
-  }
-
-  async function deleteMetricFromCloud(id) {
-    if (!currentUser) return false;
-    const { error } = await supabase
-      .from('metrics')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', currentUser.id);
-    if (error) {
-      alert('删除指标失败：' + error.message);
-      return false;
-    }
-    allMetrics = allMetrics.filter(m => m.id !== id);
-    renderMetrics();
-    return true;
-  }
-
-  // ================================================================
-  // 8. 渲染函数（Timeline、Metrics、打卡等）
-  // ================================================================
-  function renderTimeline() {
-    const container = document.getElementById('timelineContainer');
-    const countSpan = document.getElementById('recordCount');
-    const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
-    const privacyOn = loadPrivacy();
-    document.getElementById('viewerOverlay').classList.toggle('privacy-on', privacyOn);
-
-    const checkinData = getCheckinData();
-    const hasAnyCheckin = checkinData.morning.checked || checkinData.afternoon.checked || checkinData.evening.checked;
-    let checkinCardHtml = '';
-    if (hasAnyCheckin) {
-      const parts = [];
-      if (checkinData.morning.checked) parts.push(`☀️ 早上 ✅ ${checkinData.morning.time}`);
-      if (checkinData.afternoon.checked) parts.push(`🌤 下午 ✅ ${checkinData.afternoon.time}`);
-      if (checkinData.evening.checked) parts.push(`🌙 晚上 ✅ ${checkinData.evening.time}`);
-      checkinCardHtml = `
-        <div class="record-card checkin-card">
-          <div class="card-top"><div class="card-left"><div class="date"><i class="fas fa-check-circle" style="color:#1f8b5a;"></i> 📅 今日服药记录 · ${parts.join(' · ')}</div></div></div>
-        </div>
-      `;
-    }
-
-    let filtered = allRecords;
-    if (searchVal) {
-      filtered = allRecords.filter(r => {
-        const hospital = (r.hospital||'').toLowerCase();
-        const doctor = (r.doctor||'').toLowerCase();
-        const meds = (r.medications||[]).map(m=>m.name||'').join(' ').toLowerCase();
-        return hospital.includes(searchVal) || doctor.includes(searchVal) || meds.includes(searchVal);
+        html += `
+          <div class="record-card" data-id="${record.id}">
+            <div class="card-top">
+              <div class="card-left">
+                <div class="date">${warningTag} <i class="far fa-calendar-alt"></i> ${record.date||'无日期'}<span style="font-size:0.8rem;font-weight:400;color:#5682a3;margin-left:6px;">${record.purpose||''}</span></div>
+                <div class="hospital-doctor private-field"><span><i class="fas fa-hospital-alt"></i> ${record.hospital||'—'}</span><span><i class="fas fa-user-md"></i> ${record.doctor||'—'}</span></div>
+                ${symptomHtml}
+                ${medDisplayHtml}
+                ${metricHtml}${weightHtml}
+                ${record.feelings ? `<div style="font-size:0.85rem;color:#456f8f;margin-top:4px;"><i class="fas fa-quote-left" style="opacity:0.5;"></i> ${record.feelings.substring(0,60)}${record.feelings.length>60?'…':''}</div>` : ''}
+                ${record.nextVisit ? `<div style="font-size:0.8rem;color:#2d6b8f;margin-top:2px;"><i class="far fa-calendar-check"></i> 下次复查: ${record.nextVisit}</div>` : ''}
+                ${scheduleHtml}
+              </div>
+              <div class="card-actions">
+                ${viewBtn}
+                <button class="btn-sm edit-btn" data-id="${record.id}"><i class="fas fa-edit"></i> 编辑</button>
+                <button class="btn-sm btn-danger-sm delete-btn" data-id="${record.id}"><i class="fas fa-trash-alt"></i> 删除</button>
+              </div>
+            </div>
+            <div class="card-footer">
+              <span>${intervalText}</span>
+              ${costHtml}
+            </div>
+          </div>
+        `;
       });
-    }
 
-    if (filtered.length === 0 && !hasAnyCheckin) {
-      container.innerHTML = `<div class="empty-message"><i class="far fa-smile" style="font-size:2rem; display:block; margin-bottom:8px;"></i> 没有记录，开始添加吧 🌱</div>`;
+      container.innerHTML = html;
       countSpan.textContent = allRecords.length + ' 条记录';
       updateCountdown();
       updateCheckinUI();
       applyPrivacy();
-      return;
+
+      document.querySelectorAll('.view-images-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openViewer(this.dataset.id); }));
+      document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openEditModal(this.dataset.id); }));
+      document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); 
+        if (confirm('确定要删除这条记录吗？')) {
+          deleteRecordFromCloud(this.dataset.id);
+        }
+      }));
     }
 
-    const sorted = [...filtered].sort((a,b)=> a.date < b.date ? 1 : -1);
-    let html = checkinCardHtml;
-
-    sorted.forEach((record) => {
-      const currMeds = record.medications || [];
-      let hasChange = currMeds.some(m => m.status === '已停用' || m.isNew);
-      let warningTag = hasChange ? `<span class="tag-warning"><i class="fas fa-exclamation-circle"></i> 用药有调整</span>` : '';
-      const medDisplayHtml = buildMedicationDisplay(currMeds);
-
-      let symptomHtml = '';
-      if(record.purpose==='针对性检查' && record.symptomReason) {
-        symptomHtml = `<div style="font-size:0.85rem; color:#3e6b8a; margin-top:2px;"><i class="fas fa-stethoscope"></i> ${record.symptomReason}</div>`;
+    // 辅助函数
+    function getPrevRecord(records, id) {
+      const sorted=[...records].sort((a,b)=> new Date(b.date) - new Date(a.date));
+      const idx=sorted.findIndex(r=>r.id===id);
+      if(idx===-1 || idx===sorted.length-1) return null;
+      return sorted[idx+1];
+    }
+    function checkScheduleMatch(record) {
+      if (!record.nextVisit || !record.scheduleDays || record.scheduleDays.length===0) return null;
+      const wd = getWeekday(record.nextVisit);
+      if (record.scheduleDays.includes(wd)) return '✅ 该日期符合医生出诊时间';
+      return '⚠️ 该日期可能不是医生出诊时间，请确认';
+    }
+    function getWeekday(dateStr) {
+      const d = new Date(dateStr);
+      const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+      return weekdays[d.getDay()];
+    }
+    function buildMedicationDisplay(currMeds) {
+      if (!currMeds || currMeds.length === 0) {
+        return '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
       }
-
-      const imgCount = (record.images||[]).length;
-      const viewBtn = imgCount>0 ? `<button class="btn-sm view-images-btn" data-id="${record.id}"><i class="fas fa-images"></i> 查看图片 (${imgCount})</button>` : `<span style="color:#b0c8dd;font-size:0.8rem;"><i class="far fa-image"></i> 无图片</span>`;
-
-      let metricHtml = '';
-      if(record.metricValue) metricHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-chart-line"></i> 指标: ${record.metricValue}</div>`;
-      let weightHtml = '';
-      if(record.recordWeight) weightHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-weight"></i> 体重: ${record.recordWeight} kg</div>`;
-
-      let intervalText = '';
-      const prevRec = getPrevRecord(allRecords, record.id);
-      if (prevRec) {
-        const d1 = new Date(prevRec.date);
-        const d2 = new Date(record.date);
-        const diff = Math.floor((d2 - d1) / (1000*60*60*24));
-        intervalText = `距离上次就诊已过 ${diff} 天`;
-      } else {
-        intervalText = '首次记录';
+      const taking = currMeds.filter(m => m.status === '服用中' || !m.status);
+      const stopped = currMeds.filter(m => m.status === '已停用');
+      const temp = currMeds.filter(m => m.status === '临时用药');
+      let html = '';
+      if (taking.length > 0) {
+        html += `<div class="med-section"><div class="med-label">💊 长期用药</div><div class="med-tags">`;
+        taking.forEach(m => {
+          const isNew = m.isNew || false;
+          const tagClass = isNew ? 'new-tag' : 'continued';
+          const prefix = isNew ? '➕ ' : '';
+          html += `<span class="med-tag ${tagClass}">${prefix}${formatMedShort(m)}${isNew ? '（新增长期）' : '（按原方案继续服用）'}</span>`;
+        });
+        html += `</div></div>`;
       }
+      if (stopped.length > 0) {
+        html += `<div class="med-section"><div class="med-label">🛑 已停用</div><div class="med-tags">`;
+        stopped.forEach(m => {
+          html += `<span class="med-tag discontinued-tag">${formatMedShort(m)}</span>`;
+        });
+        html += `</div></div>`;
+      }
+      if (temp.length > 0) {
+        html += `<div class="med-section"><div class="med-label">📋 临时用药</div><div class="med-tags">`;
+        temp.forEach(m => {
+          html += `<span class="med-tag temp-tag">${formatMedShort(m)}</span>`;
+        });
+        html += `</div></div>`;
+      }
+      return html || '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
+    }
+    function formatMedShort(m) {
+      let parts = [m.name || ''];
+      if (m.spec) parts.push(m.spec);
+      if (m.usage) parts.push(m.usage);
+      let label = parts.filter(p=>p).join(' · ');
+      if (m.selfSupplied) label += ' · 自备';
+      if (m.longTerm) label += ' · 长期';
+      return label;
+    }
 
-      let scheduleHtml = '';
-      if (record.scheduleDays && record.scheduleDays.length>0) {
-        const daysStr = record.scheduleDays.join('、');
-        const period = record.schedulePeriod || '上午';
-        scheduleHtml = `<div style="font-size:0.8rem; color:#2d6b8f;"><i class="far fa-clock"></i> 出诊时间：${daysStr} ${period}</div>`;
-        if (record.nextVisit) {
-          const match = checkScheduleMatch(record);
-          if (match) {
-            scheduleHtml += `<div style="font-size:0.8rem; color:${match.includes('✅')?'#1f8b5a':'#b45f1a'};">${match}</div>`;
+    // ================================================================
+    // 11. 打卡
+    // ================================================================
+    function getCheckinData() {
+      try { return JSON.parse(localStorage.getItem('checkinData_v2')) || { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; } 
+      catch(e){ return { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; }
+    }
+    function saveCheckinData(d) { localStorage.setItem('checkinData_v2', JSON.stringify(d)); }
+    function resetCheckinIfNewDay() {
+      const today = new Date().toISOString().slice(0,10);
+      const data = getCheckinData();
+      if (data.date !== today) {
+        data.date = today;
+        data.morning = { checked: false, time: '' };
+        data.afternoon = { checked: false, time: '' };
+        data.evening = { checked: false, time: '' };
+        saveCheckinData(data);
+      }
+      return data;
+    }
+    function updateCheckinUI() {
+      const data = resetCheckinIfNewDay();
+      ['morning', 'afternoon', 'evening'].forEach(p => {
+        const checkbox = document.querySelector(`.checkin-checkbox[data-period="${p}"]`);
+        const timeInput = document.querySelector(`.checkin-time-input[data-period="${p}"]`);
+        const statusEl = document.querySelector(`.checkin-status[data-period="${p}"]`);
+        if (checkbox && timeInput && statusEl) {
+          const info = data[p];
+          checkbox.checked = info.checked;
+          if (info.checked && info.time) {
+            timeInput.value = info.time;
+            timeInput.classList.add('show');
+            statusEl.textContent = '✅ ' + info.time;
+          } else {
+            timeInput.value = '';
+            timeInput.classList.remove('show');
+            statusEl.textContent = '';
           }
         }
-      }
-
-      let costHtml = '';
-      const total = (record.costRegistration||0) + (record.costExam||0) + (record.costDrug||0) + (record.costTransport||0);
-      if (total > 0) {
-        costHtml = `<span class="cost-summary">💰 合计：${total.toFixed(2)} 元</span>`;
-      }
-
-      html += `
-        <div class="record-card" data-id="${record.id}">
-          <div class="card-top">
-            <div class="card-left">
-              <div class="date">${warningTag} <i class="far fa-calendar-alt"></i> ${record.date||'无日期'}<span style="font-size:0.8rem;font-weight:400;color:#5682a3;margin-left:6px;">${record.purpose||''}</span></div>
-              <div class="hospital-doctor private-field"><span><i class="fas fa-hospital-alt"></i> ${record.hospital||'—'}</span><span><i class="fas fa-user-md"></i> ${record.doctor||'—'}</span></div>
-              ${symptomHtml}
-              ${medDisplayHtml}
-              ${metricHtml}${weightHtml}
-              ${record.feelings ? `<div style="font-size:0.85rem;color:#456f8f;margin-top:4px;"><i class="fas fa-quote-left" style="opacity:0.5;"></i> ${record.feelings.substring(0,60)}${record.feelings.length>60?'…':''}</div>` : ''}
-              ${record.nextVisit ? `<div style="font-size:0.8rem;color:#2d6b8f;margin-top:2px;"><i class="far fa-calendar-check"></i> 下次复查: ${record.nextVisit}</div>` : ''}
-              ${scheduleHtml}
-            </div>
-            <div class="card-actions">
-              ${viewBtn}
-              <button class="btn-sm edit-btn" data-id="${record.id}"><i class="fas fa-edit"></i> 编辑</button>
-              <button class="btn-sm btn-danger-sm delete-btn" data-id="${record.id}"><i class="fas fa-trash-alt"></i> 删除</button>
-            </div>
-          </div>
-          <div class="card-footer">
-            <span>${intervalText}</span>
-            ${costHtml}
-          </div>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-    countSpan.textContent = allRecords.length + ' 条记录';
-    updateCountdown();
-    updateCheckinUI();
-    applyPrivacy();
-
-    document.querySelectorAll('.view-images-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openViewer(this.dataset.id); }));
-    document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openEditModal(this.dataset.id); }));
-    document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); 
-      if (confirm('确定要删除这条记录吗？')) {
-        deleteRecordFromCloud(this.dataset.id);
-      }
-    }));
-  }
-
-  // 辅助函数
-  function getPrevRecord(records, id) {
-    const sorted=[...records].sort((a,b)=> new Date(b.date) - new Date(a.date));
-    const idx=sorted.findIndex(r=>r.id===id);
-    if(idx===-1 || idx===sorted.length-1) return null;
-    return sorted[idx+1];
-  }
-  function checkScheduleMatch(record) {
-    if (!record.nextVisit || !record.scheduleDays || record.scheduleDays.length===0) return null;
-    const wd = getWeekday(record.nextVisit);
-    if (record.scheduleDays.includes(wd)) return '✅ 该日期符合医生出诊时间';
-    return '⚠️ 该日期可能不是医生出诊时间，请确认';
-  }
-  function getWeekday(dateStr) {
-    const d = new Date(dateStr);
-    const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
-    return weekdays[d.getDay()];
-  }
-  function buildMedicationDisplay(currMeds) {
-    if (!currMeds || currMeds.length === 0) {
-      return '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
-    }
-    const taking = currMeds.filter(m => m.status === '服用中' || !m.status);
-    const stopped = currMeds.filter(m => m.status === '已停用');
-    const temp = currMeds.filter(m => m.status === '临时用药');
-    let html = '';
-    if (taking.length > 0) {
-      html += `<div class="med-section"><div class="med-label">💊 长期用药</div><div class="med-tags">`;
-      taking.forEach(m => {
-        const isNew = m.isNew || false;
-        const tagClass = isNew ? 'new-tag' : 'continued';
-        const prefix = isNew ? '➕ ' : '';
-        html += `<span class="med-tag ${tagClass}">${prefix}${formatMedShort(m)}${isNew ? '（新增长期）' : '（按原方案继续服用）'}</span>`;
       });
-      html += `</div></div>`;
     }
-    if (stopped.length > 0) {
-      html += `<div class="med-section"><div class="med-label">🛑 已停用</div><div class="med-tags">`;
-      stopped.forEach(m => {
-        html += `<span class="med-tag discontinued-tag">${formatMedShort(m)}</span>`;
-      });
-      html += `</div></div>`;
-    }
-    if (temp.length > 0) {
-      html += `<div class="med-section"><div class="med-label">📋 临时用药</div><div class="med-tags">`;
-      temp.forEach(m => {
-        html += `<span class="med-tag temp-tag">${formatMedShort(m)}</span>`;
-      });
-      html += `</div></div>`;
-    }
-    return html || '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
-  }
-  function formatMedShort(m) {
-    let parts = [m.name || ''];
-    if (m.spec) parts.push(m.spec);
-    if (m.usage) parts.push(m.usage);
-    let label = parts.filter(p=>p).join(' · ');
-    if (m.selfSupplied) label += ' · 自备';
-    if (m.longTerm) label += ' · 长期';
-    return label;
-  }
-
-  // ================================================================
-  // 9. 打卡
-  // ================================================================
-  function getCheckinData() {
-    try { return JSON.parse(localStorage.getItem('checkinData_v2')) || { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; } 
-    catch(e){ return { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; }
-  }
-  function saveCheckinData(d) { localStorage.setItem('checkinData_v2', JSON.stringify(d)); }
-  function resetCheckinIfNewDay() {
-    const today = new Date().toISOString().slice(0,10);
-    const data = getCheckinData();
-    if (data.date !== today) {
-      data.date = today;
-      data.morning = { checked: false, time: '' };
-      data.afternoon = { checked: false, time: '' };
-      data.evening = { checked: false, time: '' };
-      saveCheckinData(data);
-    }
-    return data;
-  }
-  function updateCheckinUI() {
-    const data = resetCheckinIfNewDay();
-    ['morning', 'afternoon', 'evening'].forEach(p => {
-      const checkbox = document.querySelector(`.checkin-checkbox[data-period="${p}"]`);
-      const timeInput = document.querySelector(`.checkin-time-input[data-period="${p}"]`);
-      const statusEl = document.querySelector(`.checkin-status[data-period="${p}"]`);
-      if (checkbox && timeInput && statusEl) {
-        const info = data[p];
-        checkbox.checked = info.checked;
-        if (info.checked && info.time) {
-          timeInput.value = info.time;
-          timeInput.classList.add('show');
-          statusEl.textContent = '✅ ' + info.time;
-        } else {
-          timeInput.value = '';
-          timeInput.classList.remove('show');
-          statusEl.textContent = '';
-        }
-      }
-    });
-  }
-  function setupCheckinEvents() {
-    document.querySelectorAll('.checkin-checkbox').forEach(cb => {
-      cb.addEventListener('change', function(e) {
-        const period = this.dataset.period;
-        const data = getCheckinData();
-        const today = new Date().toISOString().slice(0,10);
-        if (data.date !== today) {
-          data.date = today;
-          data.morning = { checked: false, time: '' };
-          data.afternoon = { checked: false, time: '' };
-          data.evening = { checked: false, time: '' };
-        }
-        const timeInput = document.querySelector(`.checkin-time-input[data-period="${period}"]`);
-        const statusEl = document.querySelector(`.checkin-status[data-period="${period}"]`);
-        if (this.checked) {
-          const now = new Date();
-          const defaultTime = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-          timeInput.value = defaultTime;
-          timeInput.classList.add('show');
-          data[period] = { checked: true, time: defaultTime };
-          statusEl.textContent = '✅ ' + defaultTime;
-        } else {
-          timeInput.value = '';
-          timeInput.classList.remove('show');
-          data[period] = { checked: false, time: '' };
-          statusEl.textContent = '';
-        }
-        saveCheckinData(data);
-        renderTimeline();
-      });
-    });
-    document.querySelectorAll('.checkin-time-input').forEach(input => {
-      input.addEventListener('change', function() {
-        const period = this.dataset.period;
-        const data = getCheckinData();
-        const today = new Date().toISOString().slice(0,10);
-        if (data.date !== today) {
-          data.date = today;
-          data.morning = { checked: false, time: '' };
-          data.afternoon = { checked: false, time: '' };
-          data.evening = { checked: false, time: '' };
-        }
-        const checkbox = document.querySelector(`.checkin-checkbox[data-period="${period}"]`);
-        const statusEl = document.querySelector(`.checkin-status[data-period="${period}"]`);
-        if (checkbox && checkbox.checked) {
-          data[period].time = this.value;
-          statusEl.textContent = '✅ ' + this.value;
+    function setupCheckinEvents() {
+      document.querySelectorAll('.checkin-checkbox').forEach(cb => {
+        cb.addEventListener('change', function(e) {
+          const period = this.dataset.period;
+          const data = getCheckinData();
+          const today = new Date().toISOString().slice(0,10);
+          if (data.date !== today) {
+            data.date = today;
+            data.morning = { checked: false, time: '' };
+            data.afternoon = { checked: false, time: '' };
+            data.evening = { checked: false, time: '' };
+          }
+          const timeInput = document.querySelector(`.checkin-time-input[data-period="${period}"]`);
+          const statusEl = document.querySelector(`.checkin-status[data-period="${period}"]`);
+          if (this.checked) {
+            const now = new Date();
+            const defaultTime = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+            timeInput.value = defaultTime;
+            timeInput.classList.add('show');
+            data[period] = { checked: true, time: defaultTime };
+            statusEl.textContent = '✅ ' + defaultTime;
+          } else {
+            timeInput.value = '';
+            timeInput.classList.remove('show');
+            data[period] = { checked: false, time: '' };
+            statusEl.textContent = '';
+          }
           saveCheckinData(data);
-        }
+          renderTimeline();
+        });
       });
-    });
-  }
+      document.querySelectorAll('.checkin-time-input').forEach(input => {
+        input.addEventListener('change', function() {
+          const period = this.dataset.period;
+          const data = getCheckinData();
+          const today = new Date().toISOString().slice(0,10);
+          if (data.date !== today) {
+            data.date = today;
+            data.morning = { checked: false, time: '' };
+            data.afternoon = { checked: false, time: '' };
+            data.evening = { checked: false, time: '' };
+          }
+          const checkbox = document.querySelector(`.checkin-checkbox[data-period="${period}"]`);
+          const statusEl = document.querySelector(`.checkin-status[data-period="${period}"]`);
+          if (checkbox && checkbox.checked) {
+            data[period].time = this.value;
+            statusEl.textContent = '✅ ' + this.value;
+            saveCheckinData(data);
+          }
+        });
+      });
+    }
 
-  // ================================================================
-  // 10. 身体指标
-  // ================================================================
-  function renderMetrics() {
-    const tbody = document.getElementById('metricsBody');
-    const baseHeight = getBaseHeight();
-    const sorted = [...allMetrics].sort((a,b) => a.date < b.date ? 1 : -1);
-    if (sorted.length === 0) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="7">暂无指标记录，点击"添加记录"开始</td></tr>`;
+    // ================================================================
+    // 12. 身体指标
+    // ================================================================
+    function renderMetrics() {
+      const tbody = document.getElementById('metricsBody');
+      const baseHeight = getBaseHeight();
+      const sorted = [...allMetrics].sort((a,b) => a.date < b.date ? 1 : -1);
+      if (sorted.length === 0) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="7">暂无指标记录，点击"添加记录"开始</td></tr>`;
+        document.getElementById('baseHeightStatus').textContent = baseHeight ? `当前身高: ${baseHeight} cm` : '未设置';
+        document.getElementById('baseHeight').value = baseHeight || '';
+        return;
+      }
+      let html = '';
+      sorted.forEach((m, idx) => {
+        let bmi = '';
+        if (m.name === '体重' && baseHeight && m.value) {
+          const w = parseFloat(m.value);
+          if (!isNaN(w)) {
+            const h = baseHeight / 100;
+            bmi = (w / (h*h)).toFixed(1);
+          }
+        }
+        html += `<tr>
+          <td>${m.date}</td>
+          <td>${m.name || '-'}</td>
+          <td>${m.value || '-'}</td>
+          <td>${m.unit || ''}</td>
+          <td>${bmi || ''}</td>
+          <td>${m.note || ''}</td>
+          <td><button class="btn-sm btn-danger-sm delete-metric-btn" data-id="${m.id}"><i class="fas fa-trash-alt"></i></button></td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+      document.querySelectorAll('.delete-metric-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = this.dataset.id;
+          if (confirm('删除这条指标记录？')) {
+            deleteMetricFromCloud(id);
+          }
+        });
+      });
       document.getElementById('baseHeightStatus').textContent = baseHeight ? `当前身高: ${baseHeight} cm` : '未设置';
       document.getElementById('baseHeight').value = baseHeight || '';
-      return;
     }
-    let html = '';
-    sorted.forEach((m, idx) => {
-      let bmi = '';
-      if (m.name === '体重' && baseHeight && m.value) {
-        const w = parseFloat(m.value);
-        if (!isNaN(w)) {
-          const h = baseHeight / 100;
-          bmi = (w / (h*h)).toFixed(1);
+
+    document.getElementById('saveBaseHeightBtn').addEventListener('click', function() {
+      const val = parseFloat(document.getElementById('baseHeight').value);
+      if (!isNaN(val) && val > 0) {
+        setBaseHeight(val);
+        renderMetrics();
+      } else { alert('请输入有效身高 (cm)'); }
+    });
+
+    const metricModalOverlay = document.getElementById('metricModalOverlay');
+    document.getElementById('addMetricBtn').addEventListener('click', ()=>{
+      if (!currentUser) { alert('请先登录'); return; }
+      document.getElementById('metricDate').value = new Date().toISOString().slice(0,10);
+      document.getElementById('metricName').value = '';
+      document.getElementById('metricValueInput').value = '';
+      document.getElementById('metricUnit').value = '';
+      document.getElementById('metricNote').value = '';
+      metricModalOverlay.classList.add('active');
+    });
+    document.getElementById('cancelMetricBtn').addEventListener('click', ()=>metricModalOverlay.classList.remove('active'));
+    metricModalOverlay.addEventListener('click', e=>{ if(e.target===metricModalOverlay) metricModalOverlay.classList.remove('active'); });
+    document.getElementById('metricForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const date = document.getElementById('metricDate').value;
+      const name = document.getElementById('metricName').value.trim();
+      const value = document.getElementById('metricValueInput').value.trim();
+      const unit = document.getElementById('metricUnit').value.trim();
+      const note = document.getElementById('metricNote').value.trim();
+      if (!date || !name || !value) { alert('请完整填写日期、指标名称和数值'); return; }
+      const metric = { date, name, value, unit, note };
+      await addMetricToCloud(metric);
+      metricModalOverlay.classList.remove('active');
+    });
+
+    document.getElementById('clearMetricsBtn').addEventListener('click', async ()=>{
+      if (confirm('删除所有身体指标记录？')) {
+        for (let m of allMetrics) {
+          await deleteMetricFromCloud(m.id);
         }
       }
-      html += `<tr>
-        <td>${m.date}</td>
-        <td>${m.name || '-'}</td>
-        <td>${m.value || '-'}</td>
-        <td>${m.unit || ''}</td>
-        <td>${bmi || ''}</td>
-        <td>${m.note || ''}</td>
-        <td><button class="btn-sm btn-danger-sm delete-metric-btn" data-id="${m.id}"><i class="fas fa-trash-alt"></i></button></td>
-      </tr>`;
     });
-    tbody.innerHTML = html;
-    document.querySelectorAll('.delete-metric-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const id = this.dataset.id;
-        if (confirm('删除这条指标记录？')) {
-          deleteMetricFromCloud(id);
+
+    // ================================================================
+    // 13. 用药历史
+    // ================================================================
+    function renderMedHistory() {
+      if (allRecords.length === 0) {
+        document.getElementById('medHistoryContent').innerHTML = '<p style="color:#7b9bb9;">暂无用药记录</p>';
+        return;
+      }
+      const medMap = {};
+      allRecords.forEach(r => {
+        if (r.medications && r.medications.length) {
+          r.medications.forEach(m => {
+            const key = m.name || '未知药品';
+            if (!medMap[key]) medMap[key] = [];
+            medMap[key].push({ date: r.date, med: m });
+          });
         }
       });
-    });
-    document.getElementById('baseHeightStatus').textContent = baseHeight ? `当前身高: ${baseHeight} cm` : '未设置';
-    document.getElementById('baseHeight').value = baseHeight || '';
-  }
-
-  document.getElementById('saveBaseHeightBtn').addEventListener('click', function() {
-    const val = parseFloat(document.getElementById('baseHeight').value);
-    if (!isNaN(val) && val > 0) {
-      setBaseHeight(val);
-      renderMetrics();
-    } else { alert('请输入有效身高 (cm)'); }
-  });
-
-  const metricModalOverlay = document.getElementById('metricModalOverlay');
-  document.getElementById('addMetricBtn').addEventListener('click', ()=>{
-    if (!currentUser) { alert('请先登录'); return; }
-    document.getElementById('metricDate').value = new Date().toISOString().slice(0,10);
-    document.getElementById('metricName').value = '';
-    document.getElementById('metricValueInput').value = '';
-    document.getElementById('metricUnit').value = '';
-    document.getElementById('metricNote').value = '';
-    metricModalOverlay.classList.add('active');
-  });
-  document.getElementById('cancelMetricBtn').addEventListener('click', ()=>metricModalOverlay.classList.remove('active'));
-  metricModalOverlay.addEventListener('click', e=>{ if(e.target===metricModalOverlay) metricModalOverlay.classList.remove('active'); });
-  document.getElementById('metricForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const date = document.getElementById('metricDate').value;
-    const name = document.getElementById('metricName').value.trim();
-    const value = document.getElementById('metricValueInput').value.trim();
-    const unit = document.getElementById('metricUnit').value.trim();
-    const note = document.getElementById('metricNote').value.trim();
-    if (!date || !name || !value) { alert('请完整填写日期、指标名称和数值'); return; }
-    const metric = { date, name, value, unit, note };
-    await addMetricToCloud(metric);
-    metricModalOverlay.classList.remove('active');
-  });
-
-  document.getElementById('clearMetricsBtn').addEventListener('click', async ()=>{
-    if (confirm('删除所有身体指标记录？')) {
-      for (let m of allMetrics) {
-        await deleteMetricFromCloud(m.id);
+      let html = '';
+      for (const [name, entries] of Object.entries(medMap)) {
+        const sorted = entries.sort((a,b) => a.date.localeCompare(b.date));
+        const first = sorted[0].date;
+        const last = sorted[sorted.length-1].date;
+        const changes = sorted.map(e => `${e.date}: ${e.med.spec||''} ${e.med.usage||''} (${e.med.status||'服用中'})`).join(' → ');
+        html += `<div class="med-history-card">
+          <div class="med-name">💊 ${name}</div>
+          <div class="med-timeline">📅 ${first} → ${last} &nbsp;|&nbsp; 变化: ${changes}</div>
+        </div>`;
       }
+      document.getElementById('medHistoryContent').innerHTML = html || '<p style="color:#7b9bb9;">暂无用药记录</p>';
     }
-  });
 
-  // ================================================================
-  // 11. 用药历史
-  // ================================================================
-  function renderMedHistory() {
-    if (allRecords.length === 0) {
-      document.getElementById('medHistoryContent').innerHTML = '<p style="color:#7b9bb9;">暂无用药记录</p>';
-      return;
+    document.getElementById('medHistoryToggle').addEventListener('click', function(){
+      const panel = document.getElementById('medHistoryPanel');
+      panel.classList.toggle('open');
+      this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
+      if (panel.classList.contains('open')) renderMedHistory();
+    });
+
+    // ================================================================
+    // 14. 图片查看器
+    // ================================================================
+    let viewerImages=[], viewerIdx=0, viewerScale=1, viewerRot=0;
+    function openViewer(id) {
+      const r = allRecords.find(x=>x.id===id);
+      if(!r||!r.images||r.images.length===0){ alert('无图片'); return; }
+      viewerImages = r.images;
+      viewerIdx = 0; viewerScale = 1; viewerRot = 0;
+      document.getElementById('viewerOverlay').classList.add('active');
+      document.getElementById('viewerOverlay').classList.toggle('privacy-on', loadPrivacy());
+      showViewerImage();
     }
-    const medMap = {};
-    allRecords.forEach(r => {
-      if (r.medications && r.medications.length) {
-        r.medications.forEach(m => {
-          const key = m.name || '未知药品';
-          if (!medMap[key]) medMap[key] = [];
-          medMap[key].push({ date: r.date, med: m });
-        });
+    function showViewerImage() {
+      const img=document.getElementById('viewerImage');
+      if(viewerImages.length===0){ img.src=''; document.getElementById('viewerIndicator').textContent='0/0'; return; }
+      img.src = viewerImages[viewerIdx];
+      img.style.transform = `scale(${viewerScale}) rotate(${viewerRot}deg)`;
+      document.getElementById('viewerIndicator').textContent=`${viewerIdx+1} / ${viewerImages.length}`;
+    }
+    function closeViewer(){ document.getElementById('viewerOverlay').classList.remove('active'); }
+    document.getElementById('viewerCloseBtn').addEventListener('click', closeViewer);
+    document.getElementById('viewerOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('viewerOverlay')) closeViewer(); });
+    document.getElementById('viewerPrev').addEventListener('click', ()=>{ if(viewerImages.length===0)return; viewerIdx=(viewerIdx-1+viewerImages.length)%viewerImages.length; showViewerImage(); });
+    document.getElementById('viewerNext').addEventListener('click', ()=>{ if(viewerImages.length===0)return; viewerIdx=(viewerIdx+1)%viewerImages.length; showViewerImage(); });
+    document.getElementById('viewerZoomIn').addEventListener('click', ()=>{ viewerScale=Math.min(3, viewerScale+0.2); showViewerImage(); });
+    document.getElementById('viewerZoomOut').addEventListener('click', ()=>{ viewerScale=Math.max(0.3, viewerScale-0.2); showViewerImage(); });
+    document.getElementById('viewerRotate').addEventListener('click', ()=>{ viewerRot=(viewerRot+90)%360; showViewerImage(); });
+    document.addEventListener('keydown', e=>{
+      if(document.getElementById('viewerOverlay').classList.contains('active')){
+        if(e.key==='ArrowLeft'){ document.getElementById('viewerPrev').click(); e.preventDefault(); }
+        else if(e.key==='ArrowRight'){ document.getElementById('viewerNext').click(); e.preventDefault(); }
+        else if(e.key==='Escape'){ closeViewer(); }
       }
     });
-    let html = '';
-    for (const [name, entries] of Object.entries(medMap)) {
-      const sorted = entries.sort((a,b) => a.date.localeCompare(b.date));
-      const first = sorted[0].date;
-      const last = sorted[sorted.length-1].date;
-      const changes = sorted.map(e => `${e.date}: ${e.med.spec||''} ${e.med.usage||''} (${e.med.status||'服用中'})`).join(' → ');
-      html += `<div class="med-history-card">
-        <div class="med-name">💊 ${name}</div>
-        <div class="med-timeline">📅 ${first} → ${last} &nbsp;|&nbsp; 变化: ${changes}</div>
-      </div>`;
+
+    // ================================================================
+    // 15. 就诊记录弹窗
+    // ================================================================
+    const modalOverlay = document.getElementById('modalOverlay');
+    const openModalBtn = document.getElementById('openModalBtn');
+    const cancelModalBtn = document.getElementById('cancelModalBtn');
+    const recordForm = document.getElementById('recordForm');
+    const editIdInput = document.getElementById('editRecordId');
+    const modalTitle = document.getElementById('modalTitle');
+    const medicationGroup = document.getElementById('medicationGroup');
+    const addMedBtn = document.getElementById('addMedBtn');
+
+    function getSelectedScheduleDays() {
+      const checkboxes = document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]');
+      const days = [];
+      checkboxes.forEach(cb => { if (cb.checked) days.push(cb.value); });
+      return days;
     }
-    document.getElementById('medHistoryContent').innerHTML = html || '<p style="color:#7b9bb9;">暂无用药记录</p>';
-  }
-
-  document.getElementById('medHistoryToggle').addEventListener('click', function(){
-    const panel = document.getElementById('medHistoryPanel');
-    panel.classList.toggle('open');
-    this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
-    if (panel.classList.contains('open')) renderMedHistory();
-  });
-
-  // ================================================================
-  // 12. 图片查看器
-  // ================================================================
-  let viewerImages=[], viewerIdx=0, viewerScale=1, viewerRot=0;
-  function openViewer(id) {
-    const r = allRecords.find(x=>x.id===id);
-    if(!r||!r.images||r.images.length===0){ alert('无图片'); return; }
-    viewerImages = r.images;
-    viewerIdx = 0; viewerScale = 1; viewerRot = 0;
-    document.getElementById('viewerOverlay').classList.add('active');
-    document.getElementById('viewerOverlay').classList.toggle('privacy-on', loadPrivacy());
-    showViewerImage();
-  }
-  function showViewerImage() {
-    const img=document.getElementById('viewerImage');
-    if(viewerImages.length===0){ img.src=''; document.getElementById('viewerIndicator').textContent='0/0'; return; }
-    img.src = viewerImages[viewerIdx];
-    img.style.transform = `scale(${viewerScale}) rotate(${viewerRot}deg)`;
-    document.getElementById('viewerIndicator').textContent=`${viewerIdx+1} / ${viewerImages.length}`;
-  }
-  function closeViewer(){ document.getElementById('viewerOverlay').classList.remove('active'); }
-  document.getElementById('viewerCloseBtn').addEventListener('click', closeViewer);
-  document.getElementById('viewerOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('viewerOverlay')) closeViewer(); });
-  document.getElementById('viewerPrev').addEventListener('click', ()=>{ if(viewerImages.length===0)return; viewerIdx=(viewerIdx-1+viewerImages.length)%viewerImages.length; showViewerImage(); });
-  document.getElementById('viewerNext').addEventListener('click', ()=>{ if(viewerImages.length===0)return; viewerIdx=(viewerIdx+1)%viewerImages.length; showViewerImage(); });
-  document.getElementById('viewerZoomIn').addEventListener('click', ()=>{ viewerScale=Math.min(3, viewerScale+0.2); showViewerImage(); });
-  document.getElementById('viewerZoomOut').addEventListener('click', ()=>{ viewerScale=Math.max(0.3, viewerScale-0.2); showViewerImage(); });
-  document.getElementById('viewerRotate').addEventListener('click', ()=>{ viewerRot=(viewerRot+90)%360; showViewerImage(); });
-  document.addEventListener('keydown', e=>{
-    if(document.getElementById('viewerOverlay').classList.contains('active')){
-      if(e.key==='ArrowLeft'){ document.getElementById('viewerPrev').click(); e.preventDefault(); }
-      else if(e.key==='ArrowRight'){ document.getElementById('viewerNext').click(); e.preventDefault(); }
-      else if(e.key==='Escape'){ closeViewer(); }
+    function getMedsData() {
+      const rows = medicationGroup.querySelectorAll('.med-row');
+      const list = [];
+      rows.forEach(row => {
+        const name = row.querySelector('.med-name').value.trim();
+        const spec = row.querySelector('.med-spec').value.trim();
+        const usage = row.querySelector('.med-usage').value.trim();
+        const selfSupplied = row.querySelector('.med-self').checked;
+        const longTerm = row.querySelector('.med-longterm').checked;
+        const statusEl = row.querySelector('.med-status-select');
+        let status = statusEl ? statusEl.value : '服用中';
+        if (!status) status = '服用中';
+        if (name) {
+          list.push({ name, spec: spec || '', usage: usage || '', selfSupplied, longTerm, status });
+        }
+      });
+      return list;
     }
-  });
 
-  // ================================================================
-  // 13. 就诊记录弹窗（新增/编辑）
-  // ================================================================
-  const modalOverlay = document.getElementById('modalOverlay');
-  const openModalBtn = document.getElementById('openModalBtn');
-  const cancelModalBtn = document.getElementById('cancelModalBtn');
-  const recordForm = document.getElementById('recordForm');
-  const editIdInput = document.getElementById('editRecordId');
-  const modalTitle = document.getElementById('modalTitle');
-  const medicationGroup = document.getElementById('medicationGroup');
-  const addMedBtn = document.getElementById('addMedBtn');
-
-  function getSelectedScheduleDays() {
-    const checkboxes = document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]');
-    const days = [];
-    checkboxes.forEach(cb => { if (cb.checked) days.push(cb.value); });
-    return days;
-  }
-  function getMedsData() {
-    const rows = medicationGroup.querySelectorAll('.med-row');
-    const list = [];
-    rows.forEach(row => {
-      const name = row.querySelector('.med-name').value.trim();
-      const spec = row.querySelector('.med-spec').value.trim();
-      const usage = row.querySelector('.med-usage').value.trim();
-      const selfSupplied = row.querySelector('.med-self').checked;
-      const longTerm = row.querySelector('.med-longterm').checked;
-      const statusEl = row.querySelector('.med-status-select');
-      let status = statusEl ? statusEl.value : '服用中';
-      if (!status) status = '服用中';
-      if (name) {
-        list.push({ name, spec: spec || '', usage: usage || '', selfSupplied, longTerm, status });
-      }
-    });
-    return list;
-  }
-
-  function addMedRow(name='', spec='', usage='', self=false, longTerm=false, status='服用中') {
-    const row = document.createElement('div'); 
-    row.className = 'med-row';
-    row.innerHTML = `
-      <div class="med-field" style="flex:2 1 120px; position:relative;">
-        <div class="med-name-wrapper">
-          <input type="text" class="med-name" placeholder="药名" value="${name}" autocomplete="off">
-          <div class="med-name-suggestions"></div>
+    function addMedRow(name='', spec='', usage='', self=false, longTerm=false, status='服用中') {
+      const row = document.createElement('div'); 
+      row.className = 'med-row';
+      row.innerHTML = `
+        <div class="med-field" style="flex:2 1 120px; position:relative;">
+          <div class="med-name-wrapper">
+            <input type="text" class="med-name" placeholder="药名" value="${name}" autocomplete="off">
+            <div class="med-name-suggestions"></div>
+          </div>
         </div>
-      </div>
-      <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${spec}"></div>
-      <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${usage}"></div>
-      <div class="med-check"><label><input type="checkbox" class="med-self" ${self?'checked':''}> 自备</label></div>
-      <div class="med-check"><label><input type="checkbox" class="med-longterm" ${longTerm?'checked':''}> 长期</label></div>
-      <div class="med-status">
-        <select class="med-status-select">
-          <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
-          <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
-          <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
-        </select>
-      </div>
-      <button type="button" class="btn-remove-med">&times;</button>
-    `;
-    medicationGroup.appendChild(row);
-    updateRemoveBtns();
-    row.querySelector('.btn-remove-med').addEventListener('click', function() {
-      if (medicationGroup.children.length > 1) {
-        row.remove();
-        updateRemoveBtns();
-        autoSaveDraft();
-      } else {
-        alert('至少保留一种用药，可留空表示无用药。');
-      }
-    });
-    setupNameSuggestion(row.querySelector('.med-name'));
-    row.querySelectorAll('input, select').forEach(inp => {
-      inp.addEventListener('input', autoSaveDraft);
-      inp.addEventListener('change', autoSaveDraft);
-    });
-    if (name) autoFillDrugHistory(row.querySelector('.med-name'));
-  }
+        <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${spec}"></div>
+        <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${usage}"></div>
+        <div class="med-check"><label><input type="checkbox" class="med-self" ${self?'checked':''}> 自备</label></div>
+        <div class="med-check"><label><input type="checkbox" class="med-longterm" ${longTerm?'checked':''}> 长期</label></div>
+        <div class="med-status">
+          <select class="med-status-select">
+            <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
+            <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
+            <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
+          </select>
+        </div>
+        <button type="button" class="btn-remove-med">&times;</button>
+      `;
+      medicationGroup.appendChild(row);
+      updateRemoveBtns();
+      row.querySelector('.btn-remove-med').addEventListener('click', function() {
+        if (medicationGroup.children.length > 1) {
+          row.remove();
+          updateRemoveBtns();
+          autoSaveDraft();
+        } else {
+          alert('至少保留一种用药，可留空表示无用药。');
+        }
+      });
+      setupNameSuggestion(row.querySelector('.med-name'));
+      row.querySelectorAll('input, select').forEach(inp => {
+        inp.addEventListener('input', autoSaveDraft);
+        inp.addEventListener('change', autoSaveDraft);
+      });
+      if (name) autoFillDrugHistory(row.querySelector('.med-name'));
+    }
 
-  function updateRemoveBtns() {
-    const rows = medicationGroup.querySelectorAll('.med-row');
-    rows.forEach((row, i) => {
-      const btn = row.querySelector('.btn-remove-med');
-      btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
-    });
-  }
+    function updateRemoveBtns() {
+      const rows = medicationGroup.querySelectorAll('.med-row');
+      rows.forEach((row, i) => {
+        const btn = row.querySelector('.btn-remove-med');
+        btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+      });
+    }
 
-  function getHistoricalDrugNames() {
-    const names = new Set();
-    allRecords.forEach(r => {
-      if (r.medications) {
-        r.medications.forEach(m => { if (m.name) names.add(m.name); });
-      }
-    });
-    return Array.from(names).sort();
-  }
-  function getDrugHistory(name) {
-    const sorted = [...allRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
-    for (let r of sorted) {
-      if (r.medications) {
-        for (let m of r.medications) {
-          if (m.name === name) {
-            return { spec: m.spec || '', usage: m.usage || '', longTerm: !!m.longTerm };
+    function getHistoricalDrugNames() {
+      const names = new Set();
+      allRecords.forEach(r => {
+        if (r.medications) {
+          r.medications.forEach(m => { if (m.name) names.add(m.name); });
+        }
+      });
+      return Array.from(names).sort();
+    }
+    function getDrugHistory(name) {
+      const sorted = [...allRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
+      for (let r of sorted) {
+        if (r.medications) {
+          for (let m of r.medications) {
+            if (m.name === name) {
+              return { spec: m.spec || '', usage: m.usage || '', longTerm: !!m.longTerm };
+            }
           }
         }
       }
+      return null;
     }
-    return null;
-  }
-  function setupNameSuggestion(input) {
-    const wrapper = input.closest('.med-name-wrapper');
-    const suggestions = wrapper.querySelector('.med-name-suggestions');
-    input.addEventListener('input', function() {
-      const val = this.value.trim().toLowerCase();
-      if (!val) { suggestions.classList.remove('show'); return; }
-      const history = getHistoricalDrugNames();
-      const matched = history.filter(name => name.toLowerCase().includes(val));
-      if (matched.length === 0) { suggestions.classList.remove('show'); return; }
-      suggestions.innerHTML = matched.map(name => 
-        `<div class="sug-item" data-name="${name}">${name}</div>`
-      ).join('');
-      suggestions.classList.add('show');
-    });
-    input.addEventListener('blur', function() {
-      setTimeout(() => suggestions.classList.remove('show'), 200);
-    });
-    suggestions.addEventListener('click', function(e) {
-      const item = e.target.closest('.sug-item');
-      if (item) {
-        const name = item.dataset.name;
-        input.value = name;
-        suggestions.classList.remove('show');
-        autoFillDrugHistory(input);
-        autoSaveDraft();
-      }
-    });
-  }
-  function autoFillDrugHistory(input) {
-    const name = input.value.trim();
-    if (!name) return;
-    const history = getDrugHistory(name);
-    if (!history) return;
-    const row = input.closest('.med-row');
-    const specInput = row.querySelector('.med-spec');
-    const usageInput = row.querySelector('.med-usage');
-    const longTermCheck = row.querySelector('.med-longterm');
-    if (history.spec && !specInput.value) specInput.value = history.spec;
-    if (history.usage && !usageInput.value) usageInput.value = history.usage;
-    if (history.longTerm) longTermCheck.checked = true;
-  }
-  function initAllNameSuggestions() {
-    document.querySelectorAll('.med-name').forEach(inp => setupNameSuggestion(inp));
-  }
-
-  function updateCostTotal() {
-    const reg = parseFloat(document.getElementById('costRegistration').value) || 0;
-    const exam = parseFloat(document.getElementById('costExam').value) || 0;
-    const drug = parseFloat(document.getElementById('costDrug').value) || 0;
-    const transport = parseFloat(document.getElementById('costTransport').value) || 0;
-    document.getElementById('costTotalDisplay').textContent = (reg + exam + drug + transport).toFixed(2);
-  }
-
-  function renderPreview() {
-    const container=document.getElementById('filePreviewContainer'); container.innerHTML='';
-    existingImages.forEach((_,i)=>{ const div=document.createElement('div'); div.className='preview-item'; div.innerHTML=`<i class="fas fa-image"></i> 已有图片 ${i+1} <i class="fas fa-times-circle" data-existing="${i}"></i>`; container.appendChild(div); });
-    selectedFiles.forEach((file,i)=>{ 
-      const icon = file.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image';
-      const label = file.type === 'application/pdf' ? `PDF ${i+1}` : file.name.substring(0,12);
-      const div=document.createElement('div'); div.className='preview-item'; 
-      div.innerHTML=`<i class="fas ${icon}"></i> ${label} <i class="fas fa-times-circle" data-new="${i}"></i>`;
-      container.appendChild(div);
-    });
-    container.querySelectorAll('[data-existing]').forEach(el=>el.addEventListener('click', function(){ const idx=parseInt(this.dataset.existing); existingImages.splice(idx,1); renderPreview(); autoSaveDraft(); }));
-    container.querySelectorAll('[data-new]').forEach(el=>el.addEventListener('click', function(){ const idx=parseInt(this.dataset.new); selectedFiles.splice(idx,1); renderPreview(); autoSaveDraft(); }));
-  }
-
-  function resetModal() {
-    recordForm.reset(); 
-    selectedFiles=[]; existingImages=[]; pendingPDFs=[]; 
-    renderPreview(); 
-    medicationGroup.innerHTML = '';
-    addMedRow('','','',false,false,'服用中');
-    updateRemoveBtns();
-    document.getElementById('visitDate').value=new Date().toISOString().slice(0,10);
-    document.getElementById('examPurpose').value='常规复查';
-    document.getElementById('symptomGroup').classList.remove('visible');
-    document.getElementById('symptomReason').value='';
-    document.getElementById('nextVisitDateInput').value='';
-    document.getElementById('metricValue').value='';
-    document.getElementById('recordWeight').value='';
-    document.getElementById('costRegistration').value='0';
-    document.getElementById('costExam').value='0';
-    document.getElementById('costDrug').value='0';
-    document.getElementById('costTransport').value='0';
-    document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
-    document.getElementById('schedulePeriod').value='上午';
-    updateCostTotal();
-    editIdInput.value=''; modalTitle.innerHTML='<i class="fas fa-notes-medical"></i> 新就诊记录';
-    clearDraft();
-    initAllNameSuggestions();
-  }
-
-  function openEditModal(id) {
-    const r = allRecords.find(x => x.id === id);
-    if (!r) return;
-    resetModal();
-    editIdInput.value = id;
-    modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
-    document.getElementById('visitDate').value = r.date || '';
-    document.getElementById('hospitalName').value = r.hospital || '';
-    document.getElementById('doctorName').value = r.doctor || '';
-    document.getElementById('examPurpose').value = r.purpose || '常规复查';
-    if (r.scheduleDays && r.scheduleDays.length > 0) {
-      document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
-        cb.checked = r.scheduleDays.includes(cb.value);
+    function setupNameSuggestion(input) {
+      const wrapper = input.closest('.med-name-wrapper');
+      const suggestions = wrapper.querySelector('.med-name-suggestions');
+      input.addEventListener('input', function() {
+        const val = this.value.trim().toLowerCase();
+        if (!val) { suggestions.classList.remove('show'); return; }
+        const history = getHistoricalDrugNames();
+        const matched = history.filter(name => name.toLowerCase().includes(val));
+        if (matched.length === 0) { suggestions.classList.remove('show'); return; }
+        suggestions.innerHTML = matched.map(name => 
+          `<div class="sug-item" data-name="${name}">${name}</div>`
+        ).join('');
+        suggestions.classList.add('show');
       });
-    }
-    document.getElementById('schedulePeriod').value = r.schedulePeriod || '上午';
-    if (r.purpose === '针对性检查') {
-      document.getElementById('symptomGroup').classList.add('visible');
-    }
-    document.getElementById('symptomReason').value = r.symptomReason || '';
-    document.getElementById('feelings').value = r.feelings || '';
-    document.getElementById('nextVisitDateInput').value = r.nextVisit || '';
-    document.getElementById('metricValue').value = r.metricValue || '';
-    document.getElementById('recordWeight').value = r.recordWeight || '';
-    document.getElementById('costRegistration').value = r.costRegistration || 0;
-    document.getElementById('costExam').value = r.costExam || 0;
-    document.getElementById('costDrug').value = r.costDrug || 0;
-    document.getElementById('costTransport').value = r.costTransport || 0;
-    updateCostTotal();
-    if (r.medications && r.medications.length > 0) {
-      medicationGroup.innerHTML = '';
-      r.medications.forEach((m, idx) => {
-        const status = m.status || '服用中';
-        if (idx === 0) {
-          const row = document.createElement('div'); 
-          row.className = 'med-row';
-          row.innerHTML = `
-            <div class="med-field" style="flex:2 1 120px; position:relative;">
-              <div class="med-name-wrapper">
-                <input type="text" class="med-name" placeholder="药名" value="${m.name || ''}" autocomplete="off">
-                <div class="med-name-suggestions"></div>
-              </div>
-            </div>
-            <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${m.spec || ''}"></div>
-            <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${m.usage || ''}"></div>
-            <div class="med-check"><label><input type="checkbox" class="med-self" ${m.selfSupplied?'checked':''}> 自备</label></div>
-            <div class="med-check"><label><input type="checkbox" class="med-longterm" ${m.longTerm?'checked':''}> 长期</label></div>
-            <div class="med-status">
-              <select class="med-status-select">
-                <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
-                <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
-                <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
-              </select>
-            </div>
-            <button type="button" class="btn-remove-med">&times;</button>
-          `;
-          medicationGroup.appendChild(row);
-          row.querySelector('.btn-remove-med').addEventListener('click', function() {
-            if (medicationGroup.children.length > 1) {
-              row.remove();
-              updateRemoveBtns();
-              autoSaveDraft();
-            } else {
-              alert('至少保留一种用药，可留空表示无用药。');
-            }
-          });
-          setupNameSuggestion(row.querySelector('.med-name'));
-          row.querySelectorAll('input, select').forEach(inp => {
-            inp.addEventListener('input', autoSaveDraft);
-            inp.addEventListener('change', autoSaveDraft);
-          });
-        } else {
-          addMedRow(m.name || '', m.spec || '', m.usage || '', !!m.selfSupplied, !!m.longTerm, status);
+      input.addEventListener('blur', function() {
+        setTimeout(() => suggestions.classList.remove('show'), 200);
+      });
+      suggestions.addEventListener('click', function(e) {
+        const item = e.target.closest('.sug-item');
+        if (item) {
+          const name = item.dataset.name;
+          input.value = name;
+          suggestions.classList.remove('show');
+          autoFillDrugHistory(input);
+          autoSaveDraft();
         }
       });
+    }
+    function autoFillDrugHistory(input) {
+      const name = input.value.trim();
+      if (!name) return;
+      const history = getDrugHistory(name);
+      if (!history) return;
+      const row = input.closest('.med-row');
+      const specInput = row.querySelector('.med-spec');
+      const usageInput = row.querySelector('.med-usage');
+      const longTermCheck = row.querySelector('.med-longterm');
+      if (history.spec && !specInput.value) specInput.value = history.spec;
+      if (history.usage && !usageInput.value) usageInput.value = history.usage;
+      if (history.longTerm) longTermCheck.checked = true;
+    }
+    function initAllNameSuggestions() {
+      document.querySelectorAll('.med-name').forEach(inp => setupNameSuggestion(inp));
+    }
+
+    function updateCostTotal() {
+      const reg = parseFloat(document.getElementById('costRegistration').value) || 0;
+      const exam = parseFloat(document.getElementById('costExam').value) || 0;
+      const drug = parseFloat(document.getElementById('costDrug').value) || 0;
+      const transport = parseFloat(document.getElementById('costTransport').value) || 0;
+      document.getElementById('costTotalDisplay').textContent = (reg + exam + drug + transport).toFixed(2);
+    }
+
+    function renderPreview() {
+      const container=document.getElementById('filePreviewContainer'); container.innerHTML='';
+      existingImages.forEach((_,i)=>{ const div=document.createElement('div'); div.className='preview-item'; div.innerHTML=`<i class="fas fa-image"></i> 已有图片 ${i+1} <i class="fas fa-times-circle" data-existing="${i}"></i>`; container.appendChild(div); });
+      selectedFiles.forEach((file,i)=>{ 
+        const icon = file.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image';
+        const label = file.type === 'application/pdf' ? `PDF ${i+1}` : file.name.substring(0,12);
+        const div=document.createElement('div'); div.className='preview-item'; 
+        div.innerHTML=`<i class="fas ${icon}"></i> ${label} <i class="fas fa-times-circle" data-new="${i}"></i>`;
+        container.appendChild(div);
+      });
+      container.querySelectorAll('[data-existing]').forEach(el=>el.addEventListener('click', function(){ const idx=parseInt(this.dataset.existing); existingImages.splice(idx,1); renderPreview(); autoSaveDraft(); }));
+      container.querySelectorAll('[data-new]').forEach(el=>el.addEventListener('click', function(){ const idx=parseInt(this.dataset.new); selectedFiles.splice(idx,1); renderPreview(); autoSaveDraft(); }));
+    }
+
+    function resetModal() {
+      recordForm.reset(); 
+      selectedFiles=[]; existingImages=[]; pendingPDFs=[]; 
+      renderPreview(); 
+      medicationGroup.innerHTML = '';
+      addMedRow('','','',false,false,'服用中');
       updateRemoveBtns();
+      document.getElementById('visitDate').value=new Date().toISOString().slice(0,10);
+      document.getElementById('examPurpose').value='常规复查';
+      document.getElementById('symptomGroup').classList.remove('visible');
+      document.getElementById('symptomReason').value='';
+      document.getElementById('nextVisitDateInput').value='';
+      document.getElementById('metricValue').value='';
+      document.getElementById('recordWeight').value='';
+      document.getElementById('costRegistration').value='0';
+      document.getElementById('costExam').value='0';
+      document.getElementById('costDrug').value='0';
+      document.getElementById('costTransport').value='0';
+      document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+      document.getElementById('schedulePeriod').value='上午';
+      updateCostTotal();
+      editIdInput.value=''; modalTitle.innerHTML='<i class="fas fa-notes-medical"></i> 新就诊记录';
+      clearDraft();
+      initAllNameSuggestions();
     }
-    existingImages = r.images || [];
-    renderPreview();
-    initAllNameSuggestions();
-    modalOverlay.classList.add('active');
-    clearDraft();
-  }
 
-  function autoSaveDraft() {
-    const formData = {
-      editId: editIdInput.value,
-      visitDate: document.getElementById('visitDate').value,
-      hospitalName: document.getElementById('hospitalName').value,
-      doctorName: document.getElementById('doctorName').value,
-      scheduleDays: getSelectedScheduleDays(),
-      schedulePeriod: document.getElementById('schedulePeriod').value,
-      examPurpose: document.getElementById('examPurpose').value,
-      symptomReason: document.getElementById('symptomReason').value,
-      recordWeight: document.getElementById('recordWeight').value,
-      metricValue: document.getElementById('metricValue').value,
-      costRegistration: document.getElementById('costRegistration').value,
-      costExam: document.getElementById('costExam').value,
-      costDrug: document.getElementById('costDrug').value,
-      costTransport: document.getElementById('costTransport').value,
-      feelings: document.getElementById('feelings').value,
-      nextVisitDateInput: document.getElementById('nextVisitDateInput').value,
-      medications: getMedsData(),
-      hasImages: selectedFiles.length > 0 || existingImages.length > 0
-    };
-    saveDraft(formData);
-  }
-
-  function openModalWithDraftCheck() {
-    if (!currentUser) { alert('请先登录'); return; }
-    const draft = loadDraft();
-    if (draft && Object.keys(draft).length > 1) {
-      if (confirm('检测到未保存的草稿，是否恢复？')) {
-        resetModal();
-        restoreDraft(draft);
-        modalOverlay.classList.add('active');
-        return;
-      } else {
-        clearDraft();
-      }
-    }
-    resetModal();
-    modalOverlay.classList.add('active');
-  }
-
-  function restoreDraft(draft) {
-    if (!draft) return false;
-    try {
-      if (draft.editId) editIdInput.value = draft.editId;
-      if (draft.visitDate) document.getElementById('visitDate').value = draft.visitDate;
-      if (draft.hospitalName) document.getElementById('hospitalName').value = draft.hospitalName;
-      if (draft.doctorName) document.getElementById('doctorName').value = draft.doctorName;
-      if (draft.schedulePeriod) document.getElementById('schedulePeriod').value = draft.schedulePeriod;
-      if (draft.examPurpose) document.getElementById('examPurpose').value = draft.examPurpose;
-      if (draft.symptomReason) document.getElementById('symptomReason').value = draft.symptomReason;
-      if (draft.recordWeight) document.getElementById('recordWeight').value = draft.recordWeight;
-      if (draft.metricValue) document.getElementById('metricValue').value = draft.metricValue;
-      if (draft.costRegistration) document.getElementById('costRegistration').value = draft.costRegistration;
-      if (draft.costExam) document.getElementById('costExam').value = draft.costExam;
-      if (draft.costDrug) document.getElementById('costDrug').value = draft.costDrug;
-      if (draft.costTransport) document.getElementById('costTransport').value = draft.costTransport;
-      if (draft.feelings) document.getElementById('feelings').value = draft.feelings;
-      if (draft.nextVisitDateInput) document.getElementById('nextVisitDateInput').value = draft.nextVisitDateInput;
-      if (draft.scheduleDays && draft.scheduleDays.length>0) {
-        const checkboxes = document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-          cb.checked = draft.scheduleDays.includes(cb.value);
+    function openEditModal(id) {
+      const r = allRecords.find(x => x.id === id);
+      if (!r) return;
+      resetModal();
+      editIdInput.value = id;
+      modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
+      document.getElementById('visitDate').value = r.date || '';
+      document.getElementById('hospitalName').value = r.hospital || '';
+      document.getElementById('doctorName').value = r.doctor || '';
+      document.getElementById('examPurpose').value = r.purpose || '常规复查';
+      if (r.scheduleDays && r.scheduleDays.length > 0) {
+        document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
+          cb.checked = r.scheduleDays.includes(cb.value);
         });
       }
-      if (draft.medications && draft.medications.length>0) {
+      document.getElementById('schedulePeriod').value = r.schedulePeriod || '上午';
+      if (r.purpose === '针对性检查') {
+        document.getElementById('symptomGroup').classList.add('visible');
+      }
+      document.getElementById('symptomReason').value = r.symptomReason || '';
+      document.getElementById('feelings').value = r.feelings || '';
+      document.getElementById('nextVisitDateInput').value = r.nextVisit || '';
+      document.getElementById('metricValue').value = r.metricValue || '';
+      document.getElementById('recordWeight').value = r.recordWeight || '';
+      document.getElementById('costRegistration').value = r.costRegistration || 0;
+      document.getElementById('costExam').value = r.costExam || 0;
+      document.getElementById('costDrug').value = r.costDrug || 0;
+      document.getElementById('costTransport').value = r.costTransport || 0;
+      updateCostTotal();
+      if (r.medications && r.medications.length > 0) {
         medicationGroup.innerHTML = '';
-        draft.medications.forEach((m, idx) => {
+        r.medications.forEach((m, idx) => {
           const status = m.status || '服用中';
           if (idx === 0) {
             const row = document.createElement('div'); 
@@ -1682,45 +1590,153 @@
         });
         updateRemoveBtns();
       }
-      if (draft.editId) {
-        modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
-      }
-      updateCostTotal();
-      return true;
-    } catch(e) { return false; }
-  }
-
-  function setupAutoSave() {
-    const fields = ['visitDate','hospitalName','doctorName','schedulePeriod','examPurpose','symptomReason',
-      'recordWeight','metricValue','costRegistration','costExam','costDrug','costTransport','feelings','nextVisitDateInput'];
-    fields.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.addEventListener('input', autoSaveDraft);
-        el.addEventListener('change', autoSaveDraft);
-      }
-    });
-    document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', autoSaveDraft);
-    });
-    medicationGroup.addEventListener('input', autoSaveDraft);
-    medicationGroup.addEventListener('change', autoSaveDraft);
-  }
-
-  openModalBtn.addEventListener('click', openModalWithDraftCheck);
-  cancelModalBtn.addEventListener('click', function() {
-    const draft = loadDraft();
-    if (draft && Object.keys(draft).length > 1) {
-      if (confirm('当前内容尚未保存，确定要退出吗？')) {
-        clearDraft();
-        modalOverlay.classList.remove('active');
-      }
-    } else {
-      modalOverlay.classList.remove('active');
+      existingImages = r.images || [];
+      renderPreview();
+      initAllNameSuggestions();
+      modalOverlay.classList.add('active');
+      clearDraft();
     }
-  });
-  modalOverlay.addEventListener('click', e=>{ 
-    if(e.target===modalOverlay) {
+
+    function autoSaveDraft() {
+      const formData = {
+        editId: editIdInput.value,
+        visitDate: document.getElementById('visitDate').value,
+        hospitalName: document.getElementById('hospitalName').value,
+        doctorName: document.getElementById('doctorName').value,
+        scheduleDays: getSelectedScheduleDays(),
+        schedulePeriod: document.getElementById('schedulePeriod').value,
+        examPurpose: document.getElementById('examPurpose').value,
+        symptomReason: document.getElementById('symptomReason').value,
+        recordWeight: document.getElementById('recordWeight').value,
+        metricValue: document.getElementById('metricValue').value,
+        costRegistration: document.getElementById('costRegistration').value,
+        costExam: document.getElementById('costExam').value,
+        costDrug: document.getElementById('costDrug').value,
+        costTransport: document.getElementById('costTransport').value,
+        feelings: document.getElementById('feelings').value,
+        nextVisitDateInput: document.getElementById('nextVisitDateInput').value,
+        medications: getMedsData(),
+        hasImages: selectedFiles.length > 0 || existingImages.length > 0
+      };
+      saveDraft(formData);
+    }
+
+    function openModalWithDraftCheck() {
+      if (!currentUser) { alert('请先登录'); return; }
+      const draft = loadDraft();
+      if (draft && Object.keys(draft).length > 1) {
+        if (confirm('检测到未保存的草稿，是否恢复？')) {
+          resetModal();
+          restoreDraft(draft);
+          modalOverlay.classList.add('active');
+          return;
+        } else {
+          clearDraft();
+        }
+      }
+      resetModal();
+      modalOverlay.classList.add('active');
+    }
+
+    function restoreDraft(draft) {
+      if (!draft) return false;
+      try {
+        if (draft.editId) editIdInput.value = draft.editId;
+        if (draft.visitDate) document.getElementById('visitDate').value = draft.visitDate;
+        if (draft.hospitalName) document.getElementById('hospitalName').value = draft.hospitalName;
+        if (draft.doctorName) document.getElementById('doctorName').value = draft.doctorName;
+        if (draft.schedulePeriod) document.getElementById('schedulePeriod').value = draft.schedulePeriod;
+        if (draft.examPurpose) document.getElementById('examPurpose').value = draft.examPurpose;
+        if (draft.symptomReason) document.getElementById('symptomReason').value = draft.symptomReason;
+        if (draft.recordWeight) document.getElementById('recordWeight').value = draft.recordWeight;
+        if (draft.metricValue) document.getElementById('metricValue').value = draft.metricValue;
+        if (draft.costRegistration) document.getElementById('costRegistration').value = draft.costRegistration;
+        if (draft.costExam) document.getElementById('costExam').value = draft.costExam;
+        if (draft.costDrug) document.getElementById('costDrug').value = draft.costDrug;
+        if (draft.costTransport) document.getElementById('costTransport').value = draft.costTransport;
+        if (draft.feelings) document.getElementById('feelings').value = draft.feelings;
+        if (draft.nextVisitDateInput) document.getElementById('nextVisitDateInput').value = draft.nextVisitDateInput;
+        if (draft.scheduleDays && draft.scheduleDays.length>0) {
+          const checkboxes = document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]');
+          checkboxes.forEach(cb => {
+            cb.checked = draft.scheduleDays.includes(cb.value);
+          });
+        }
+        if (draft.medications && draft.medications.length>0) {
+          medicationGroup.innerHTML = '';
+          draft.medications.forEach((m, idx) => {
+            const status = m.status || '服用中';
+            if (idx === 0) {
+              const row = document.createElement('div'); 
+              row.className = 'med-row';
+              row.innerHTML = `
+                <div class="med-field" style="flex:2 1 120px; position:relative;">
+                  <div class="med-name-wrapper">
+                    <input type="text" class="med-name" placeholder="药名" value="${m.name || ''}" autocomplete="off">
+                    <div class="med-name-suggestions"></div>
+                  </div>
+                </div>
+                <div class="med-field"><input type="text" class="med-spec" placeholder="规格" value="${m.spec || ''}"></div>
+                <div class="med-field"><input type="text" class="med-usage" placeholder="用法" value="${m.usage || ''}"></div>
+                <div class="med-check"><label><input type="checkbox" class="med-self" ${m.selfSupplied?'checked':''}> 自备</label></div>
+                <div class="med-check"><label><input type="checkbox" class="med-longterm" ${m.longTerm?'checked':''}> 长期</label></div>
+                <div class="med-status">
+                  <select class="med-status-select">
+                    <option value="服用中" ${status==='服用中'?'selected':''}>✅ 服用中</option>
+                    <option value="已停用" ${status==='已停用'?'selected':''}>❌ 已停用</option>
+                    <option value="临时用药" ${status==='临时用药'?'selected':''}>📋 临时用药</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-remove-med">&times;</button>
+              `;
+              medicationGroup.appendChild(row);
+              row.querySelector('.btn-remove-med').addEventListener('click', function() {
+                if (medicationGroup.children.length > 1) {
+                  row.remove();
+                  updateRemoveBtns();
+                  autoSaveDraft();
+                } else {
+                  alert('至少保留一种用药，可留空表示无用药。');
+                }
+              });
+              setupNameSuggestion(row.querySelector('.med-name'));
+              row.querySelectorAll('input, select').forEach(inp => {
+                inp.addEventListener('input', autoSaveDraft);
+                inp.addEventListener('change', autoSaveDraft);
+              });
+            } else {
+              addMedRow(m.name || '', m.spec || '', m.usage || '', !!m.selfSupplied, !!m.longTerm, status);
+            }
+          });
+          updateRemoveBtns();
+        }
+        if (draft.editId) {
+          modalTitle.innerHTML = '<i class="fas fa-edit"></i> 编辑记录';
+        }
+        updateCostTotal();
+        return true;
+      } catch(e) { return false; }
+    }
+
+    function setupAutoSave() {
+      const fields = ['visitDate','hospitalName','doctorName','schedulePeriod','examPurpose','symptomReason',
+        'recordWeight','metricValue','costRegistration','costExam','costDrug','costTransport','feelings','nextVisitDateInput'];
+      fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', autoSaveDraft);
+          el.addEventListener('change', autoSaveDraft);
+        }
+      });
+      document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', autoSaveDraft);
+      });
+      medicationGroup.addEventListener('input', autoSaveDraft);
+      medicationGroup.addEventListener('change', autoSaveDraft);
+    }
+
+    openModalBtn.addEventListener('click', openModalWithDraftCheck);
+    cancelModalBtn.addEventListener('click', function() {
       const draft = loadDraft();
       if (draft && Object.keys(draft).length > 1) {
         if (confirm('当前内容尚未保存，确定要退出吗？')) {
@@ -1730,390 +1746,408 @@
       } else {
         modalOverlay.classList.remove('active');
       }
-    }
-  });
-  addMedBtn.addEventListener('click', ()=>addMedRow('','','',false,false,'服用中'));
-  document.getElementById('examPurpose').addEventListener('change', function(){ 
-    document.getElementById('symptomGroup').classList.toggle('visible', this.value==='针对性检查');
-    autoSaveDraft();
-  });
+    });
+    modalOverlay.addEventListener('click', e=>{ 
+      if(e.target===modalOverlay) {
+        const draft = loadDraft();
+        if (draft && Object.keys(draft).length > 1) {
+          if (confirm('当前内容尚未保存，确定要退出吗？')) {
+            clearDraft();
+            modalOverlay.classList.remove('active');
+          }
+        } else {
+          modalOverlay.classList.remove('active');
+        }
+      }
+    });
+    addMedBtn.addEventListener('click', ()=>addMedRow('','','',false,false,'服用中'));
+    document.getElementById('examPurpose').addEventListener('change', function(){ 
+      document.getElementById('symptomGroup').classList.toggle('visible', this.value==='针对性检查');
+      autoSaveDraft();
+    });
 
-  // 文件上传
-  const dropArea=document.getElementById('dropArea'), fileInput=document.getElementById('fileInput');
-  async function handleFiles(files) {
-    for (let f of files) {
-      if (f.type === 'application/pdf') {
-        selectedFiles.push(f);
-        try {
-          const arrayBuffer = await f.arrayBuffer();
-          const pdfData = new Uint8Array(arrayBuffer);
-          const img = await renderPDFToImage(pdfData, 1);
-          if (img) {
-            pendingPDFs.push({ data: pdfData, pages: 0 });
-            existingImages.push(img);
-          } else {
+    // 文件上传
+    const dropArea=document.getElementById('dropArea'), fileInput=document.getElementById('fileInput');
+    async function handleFiles(files) {
+      for (let f of files) {
+        if (f.type === 'application/pdf') {
+          selectedFiles.push(f);
+          try {
+            const arrayBuffer = await f.arrayBuffer();
+            const pdfData = new Uint8Array(arrayBuffer);
+            const img = await renderPDFToImage(pdfData, 1);
+            if (img) {
+              pendingPDFs.push({ data: pdfData, pages: 0 });
+              existingImages.push(img);
+            } else {
+              selectedFiles.push(f);
+            }
+          } catch(e) {
+            console.warn('PDF处理失败:', e);
             selectedFiles.push(f);
           }
-        } catch(e) {
-          console.warn('PDF处理失败:', e);
+        } else if (f.type === 'image/jpeg' || f.type === 'image/png') {
           selectedFiles.push(f);
         }
-      } else if (f.type === 'image/jpeg' || f.type === 'image/png') {
-        selectedFiles.push(f);
       }
+      renderPreview();
+      autoSaveDraft();
     }
-    renderPreview();
-    autoSaveDraft();
-  }
 
-  dropArea.addEventListener('click', ()=>fileInput.click());
-  dropArea.addEventListener('dragover', e=>{ e.preventDefault(); dropArea.classList.add('dragover'); });
-  dropArea.addEventListener('dragleave', ()=>dropArea.classList.remove('dragover'));
-  dropArea.addEventListener('drop', async e=>{ 
-    e.preventDefault(); dropArea.classList.remove('dragover'); 
-    if(e.dataTransfer.files.length) await handleFiles(e.dataTransfer.files);
-  });
-  fileInput.addEventListener('change', async e=>{ if(e.target.files.length){ await handleFiles(e.target.files); fileInput.value=''; } });
-
-  // PDF渲染
-  async function renderPDFToImage(pdfData, pageNum = 1) {
-    try {
-      const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-      const pdf = await loadingTask.promise;
-      const page = await pdf.getPage(pageNum);
-      const scale = 1.5;
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      return canvas.toDataURL('image/jpeg', 0.8);
-    } catch(e) {
-      console.warn('PDF渲染失败:', e);
-      return null;
-    }
-  }
-  async function renderPDFAllPages(pdfData) {
-    try {
-      const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-      const pdf = await loadingTask.promise;
-      const images = [];
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const img = await renderPDFToImage(pdfData, i);
-        if (img) images.push(img);
-      }
-      return images;
-    } catch(e) {
-      console.warn('PDF多页渲染失败:', e);
-      return null;
-    }
-  }
-  function compressImage(file) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let w=img.width, h=img.height;
-          const maxW=1200;
-          if(w>maxW){ h=(h*maxW)/w; w=maxW; }
-          canvas.width=w; canvas.height=h;
-          const ctx=canvas.getContext('2d');
-          ctx.drawImage(img,0,0,w,h);
-          resolve(canvas.toDataURL('image/jpeg',0.8));
-        };
-      };
+    dropArea.addEventListener('click', ()=>fileInput.click());
+    dropArea.addEventListener('dragover', e=>{ e.preventDefault(); dropArea.classList.add('dragover'); });
+    dropArea.addEventListener('dragleave', ()=>dropArea.classList.remove('dragover'));
+    dropArea.addEventListener('drop', async e=>{ 
+      e.preventDefault(); dropArea.classList.remove('dragover'); 
+      if(e.dataTransfer.files.length) await handleFiles(e.dataTransfer.files);
     });
-  }
+    fileInput.addEventListener('change', async e=>{ if(e.target.files.length){ await handleFiles(e.target.files); fileInput.value=''; } });
 
-  // ================================================================
-  // 14. 保存就诊记录
-  // ================================================================
-  recordForm.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    if (!currentUser) { alert('请先登录'); return; }
-    const date=document.getElementById('visitDate').value;
-    const hospital=document.getElementById('hospitalName').value.trim();
-    const doctor=document.getElementById('doctorName').value.trim();
-    const purpose=document.getElementById('examPurpose').value;
-    const symptomReason=document.getElementById('symptomReason').value.trim();
-    const feelings=document.getElementById('feelings').value.trim();
-    const nextVisit=document.getElementById('nextVisitDateInput').value;
-    const metricValue=document.getElementById('metricValue').value.trim();
-    const recordWeight=document.getElementById('recordWeight').value.trim();
-    const scheduleDays = getSelectedScheduleDays();
-    const schedulePeriod = document.getElementById('schedulePeriod').value;
-    const costRegistration=parseFloat(document.getElementById('costRegistration').value) || 0;
-    const costExam=parseFloat(document.getElementById('costExam').value) || 0;
-    const costDrug=parseFloat(document.getElementById('costDrug').value) || 0;
-    const costTransport=parseFloat(document.getElementById('costTransport').value) || 0;
-    const medications = getMedsData();
-    const editId = document.getElementById('editRecordId').value;
-
-    if(!date||!hospital||!doctor){ alert('请填写日期、医院、医生'); return; }
-
-    let compressed = [...existingImages];
-    for (let f of selectedFiles) {
-      if (f.type === 'application/pdf') {
-        try {
-          const arrayBuffer = await f.arrayBuffer();
-          const pdfData = new Uint8Array(arrayBuffer);
-          const pages = await renderPDFAllPages(pdfData);
-          if (pages && pages.length>0) {
-            compressed = compressed.concat(pages);
-          } else {
-            const base64 = btoa(String.fromCharCode(...pdfData));
-            compressed.push('PDF:' + base64);
-          }
-        } catch(e) { console.warn('PDF处理失败:', e); }
-      } else {
-        try {
-          const img = await compressImage(f);
-          compressed.push(img);
-        } catch(e) {}
-      }
-    }
-
-    const finalMeds = medications.map(m => ({ ...m, isNew: false }));
-
-    const recordData = {
-      date, hospital, doctor, purpose,
-      symptomReason: purpose==='针对性检查' ? symptomReason : '',
-      feelings,
-      nextVisit: nextVisit || '',
-      medications: finalMeds,
-      metricValue,
-      recordWeight,
-      scheduleDays,
-      schedulePeriod,
-      costRegistration,
-      costExam,
-      costDrug,
-      costTransport,
-      images: compressed,
-    };
-
-    let success = false;
-    if (editId) {
-      const oldRecord = allRecords.find(r => r.id === editId);
-      if (oldRecord) {
-        const oldNames = new Set((oldRecord.medications || []).map(m => m.name));
-        finalMeds.forEach(m => {
-          if (!oldNames.has(m.name)) m.isNew = true;
-        });
-      }
-      recordData.id = editId;
-      success = await updateRecordInCloud(editId, recordData);
-    } else {
-      finalMeds.forEach(m => m.isNew = true);
-      success = await addRecordToCloud(recordData);
-    }
-    if (success) {
-      showSaveFeedback('✅ 保存成功');
-      clearDraft();
-      modalOverlay.classList.remove('active');
-      renderTimeline();
-      renderMedHistory();
-    }
-  });
-
-  // ================================================================
-  // 15. 其他功能
-  // ================================================================
-  document.getElementById('clearAllBtn').addEventListener('click', async ()=>{
-    if (!currentUser) { alert('请先登录'); return; }
-    if (confirm('确定要删除所有就诊记录吗？此操作不可恢复！')) {
-      for (let r of allRecords) {
-        await deleteRecordFromCloud(r.id);
-      }
-      renderTimeline();
-    }
-  });
-
-  document.getElementById('resetAllBtn').addEventListener('click', function() {
-    if (confirm('确定要清空所有健康档案数据吗？此操作不可恢复！')) {
-      localStorage.clear();
-      location.reload();
-    }
-  });
-
-  document.getElementById('searchInput').addEventListener('input', renderTimeline);
-
-  document.getElementById('privacyToggle').addEventListener('change', function(){
-    savePrivacy(this.checked);
-    applyPrivacy();
-    renderTimeline();
-  });
-
-  function applyPrivacy() {
-    const on = loadPrivacy();
-    document.getElementById('appContainer').classList.toggle('privacy-hidden', on);
-    document.getElementById('viewerOverlay').classList.toggle('privacy-on', on);
-  }
-
-  // 导出报告
-  document.getElementById('exportReportBtn').addEventListener('click', function(){
-    if (allRecords.length === 0) { alert('没有记录可导出'); return; }
-    const sorted = [...allRecords].sort((a,b)=>a.date<b.date?1:-1);
-    let html = '<div style="font-family:Segoe UI,sans-serif; padding:0.5rem;">';
-    html += `<h3 style="border-bottom:2px solid #1f4a6e; padding-bottom:0.5rem;">📋 健康档案报告</h3><p>共 ${allRecords.length} 条记录</p>`;
-    sorted.forEach(r => {
-      const total = (r.costRegistration||0)+(r.costExam||0)+(r.costDrug||0)+(r.costTransport||0);
-      html += `<div style="border:1px solid #e0eaf3; border-radius:20px; padding:1rem; margin:1rem 0; background:#fafdff;">`;
-      html += `<div><strong>${r.date||''}</strong> · ${r.hospital||''} · ${r.doctor||''}</div>`;
-      html += `<div style="font-size:0.9rem; color:#2d577a;">检查目的: ${r.purpose||''}</div>`;
-      if(r.symptomReason) html += `<div style="font-size:0.9rem;">症状: ${r.symptomReason}</div>`;
-      if(r.medications && r.medications.length) {
-        html += `<div style="font-size:0.9rem;">用药: ${r.medications.map(m => {
-          let label = `${m.name||''}${m.spec?' · '+m.spec:''}${m.usage?' · '+m.usage:''}`;
-          if(m.selfSupplied) label += ' · 自备';
-          if(m.longTerm) label += ' · 长期';
-          label += ` (${m.status||'服用中'})`;
-          return label;
-        }).join('; ')}</div>`;
-      }
-      if(r.feelings) html += `<div style="font-size:0.9rem;">感想: ${r.feelings}</div>`;
-      if(r.nextVisit) html += `<div style="font-size:0.9rem;">下次复查: ${r.nextVisit}</div>`;
-      if(r.scheduleDays && r.scheduleDays.length>0) {
-        html += `<div style="font-size:0.9rem;">出诊时间: ${r.scheduleDays.join('、')} ${r.schedulePeriod||''}</div>`;
-      }
-      if(total>0) {
-        html += `<div style="font-size:0.9rem;">💰 费用: 挂号费 ${(r.costRegistration||0).toFixed(2)}元, 检查费 ${(r.costExam||0).toFixed(2)}元, 药费 ${(r.costDrug||0).toFixed(2)}元, 交通费 ${(r.costTransport||0).toFixed(2)}元, 合计 ${total.toFixed(2)}元</div>`;
-      }
-      if(r.images && r.images.length>0) {
-        const imgs = r.images.filter(img => !img.startsWith('PDF:'));
-        const pdfs = r.images.filter(img => img.startsWith('PDF:'));
-        if (imgs.length>0) {
-          const show = imgs.slice(0,3);
-          const rest = imgs.length - 3;
-          html += `<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">`;
-          show.forEach(img => {
-            html += `<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:12px;border:1px solid #d6e3f0;">`;
-          });
-          if(rest>0) html += `<span style="display:inline-flex;align-items:center;font-size:0.8rem;color:#5a7f9e;">+${rest}张</span>`;
-          html += `</div>`;
-        }
-        if (pdfs.length>0) {
-          html += `<div style="font-size:0.8rem;color:#5a7f9e;margin-top:4px;">📄 PDF文件 ${pdfs.length} 个</div>`;
-        }
-      }
-      html += `</div>`;
-    });
-    html += '</div>';
-    document.getElementById('reportContent').innerHTML = html;
-    document.getElementById('reportModalOverlay').classList.add('active');
-  });
-
-  document.getElementById('closeReportBtn').addEventListener('click', ()=>document.getElementById('reportModalOverlay').classList.remove('active'));
-  document.getElementById('printReportBtn').addEventListener('click', function(){
-    const content=document.getElementById('reportContent').innerHTML;
-    const win=window.open('', '_blank');
-    win.document.write(`<html><head><title>健康报告</title><style>body{font-family:Segoe UI,sans-serif;padding:2rem;}img{max-width:100px;}</style></head><body>${content}<script>window.onload=function(){ window.print(); }<\/script></body></html>`);
-    win.document.close();
-  });
-  document.getElementById('reportModalOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('reportModalOverlay')) document.getElementById('reportModalOverlay').classList.remove('active'); });
-
-  // 数据导入/导出
-  document.getElementById('exportDataBtn').addEventListener('click', function() {
-    const data = {
-      records: allRecords,
-      metrics: allMetrics,
-      checkin: getCheckinData(),
-      baseHeight: getBaseHeight(),
-      exportedAt: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `health_backup_${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-
-  document.getElementById('importDataBtn').addEventListener('click', ()=>document.getElementById('importFileInput').click());
-  document.getElementById('importFileInput').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(ev) {
+    // PDF渲染
+    async function renderPDFToImage(pdfData, pageNum = 1) {
       try {
-        const data = JSON.parse(ev.target.result);
-        if (data.records && currentUser) {
-          for (let r of data.records) {
-            delete r.id;
-            await addRecordToCloud(r);
-          }
+        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(pageNum);
+        const scale = 1.5;
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        return canvas.toDataURL('image/jpeg', 0.8);
+      } catch(e) {
+        console.warn('PDF渲染失败:', e);
+        return null;
+      }
+    }
+    async function renderPDFAllPages(pdfData) {
+      try {
+        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+        const pdf = await loadingTask.promise;
+        const images = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const img = await renderPDFToImage(pdfData, i);
+          if (img) images.push(img);
         }
-        if (data.metrics && currentUser) {
-          for (let m of data.metrics) {
-            delete m.id;
-            await addMetricToCloud(m);
-          }
+        return images;
+      } catch(e) {
+        console.warn('PDF多页渲染失败:', e);
+        return null;
+      }
+    }
+    function compressImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w=img.width, h=img.height;
+            const maxW=1200;
+            if(w>maxW){ h=(h*maxW)/w; w=maxW; }
+            canvas.width=w; canvas.height=h;
+            const ctx=canvas.getContext('2d');
+            ctx.drawImage(img,0,0,w,h);
+            resolve(canvas.toDataURL('image/jpeg',0.8));
+          };
+        };
+      });
+    }
+
+    // ================================================================
+    // 16. 保存就诊记录
+    // ================================================================
+    recordForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if (!currentUser) { alert('请先登录'); return; }
+      const date=document.getElementById('visitDate').value;
+      const hospital=document.getElementById('hospitalName').value.trim();
+      const doctor=document.getElementById('doctorName').value.trim();
+      const purpose=document.getElementById('examPurpose').value;
+      const symptomReason=document.getElementById('symptomReason').value.trim();
+      const feelings=document.getElementById('feelings').value.trim();
+      const nextVisit=document.getElementById('nextVisitDateInput').value;
+      const metricValue=document.getElementById('metricValue').value.trim();
+      const recordWeight=document.getElementById('recordWeight').value.trim();
+      const scheduleDays = getSelectedScheduleDays();
+      const schedulePeriod = document.getElementById('schedulePeriod').value;
+      const costRegistration=parseFloat(document.getElementById('costRegistration').value) || 0;
+      const costExam=parseFloat(document.getElementById('costExam').value) || 0;
+      const costDrug=parseFloat(document.getElementById('costDrug').value) || 0;
+      const costTransport=parseFloat(document.getElementById('costTransport').value) || 0;
+      const medications = getMedsData();
+      const editId = document.getElementById('editRecordId').value;
+
+      if(!date||!hospital||!doctor){ alert('请填写日期、医院、医生'); return; }
+
+      let compressed = [...existingImages];
+      for (let f of selectedFiles) {
+        if (f.type === 'application/pdf') {
+          try {
+            const arrayBuffer = await f.arrayBuffer();
+            const pdfData = new Uint8Array(arrayBuffer);
+            const pages = await renderPDFAllPages(pdfData);
+            if (pages && pages.length>0) {
+              compressed = compressed.concat(pages);
+            } else {
+              const base64 = btoa(String.fromCharCode(...pdfData));
+              compressed.push('PDF:' + base64);
+            }
+          } catch(e) { console.warn('PDF处理失败:', e); }
+        } else {
+          try {
+            const img = await compressImage(f);
+            compressed.push(img);
+          } catch(e) {}
         }
-        if (data.checkin) saveCheckinData(data.checkin);
-        if (data.baseHeight) setBaseHeight(data.baseHeight);
-        alert('数据导入成功！');
-        location.reload();
-      } catch(err) { alert('导入失败，请检查文件格式是否正确。'); }
-    };
-    reader.readAsText(file);
-    this.value = '';
-  });
+      }
 
-  document.getElementById('metricsToggle').addEventListener('click', function(){
-    const panel=document.getElementById('metricsPanel');
-    panel.classList.toggle('open');
-    this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
-  });
+      const finalMeds = medications.map(m => ({ ...m, isNew: false }));
 
-  function updateCountdown() {
-    let nearest = null;
-    const today = new Date(); today.setHours(0,0,0,0);
-    allRecords.forEach(r => {
-      if(r.nextVisit) {
-        const d = new Date(r.nextVisit); d.setHours(0,0,0,0);
-        if(d >= today && (!nearest || d < new Date(nearest))) nearest = r.nextVisit;
+      const recordData = {
+        date, hospital, doctor, purpose,
+        symptomReason: purpose==='针对性检查' ? symptomReason : '',
+        feelings,
+        nextVisit: nextVisit || '',
+        medications: finalMeds,
+        metricValue,
+        recordWeight,
+        scheduleDays,
+        schedulePeriod,
+        costRegistration,
+        costExam,
+        costDrug,
+        costTransport,
+        images: compressed,
+      };
+
+      let success = false;
+      if (editId) {
+        const oldRecord = allRecords.find(r => r.id === editId);
+        if (oldRecord) {
+          const oldNames = new Set((oldRecord.medications || []).map(m => m.name));
+          finalMeds.forEach(m => {
+            if (!oldNames.has(m.name)) m.isNew = true;
+          });
+        }
+        recordData.id = editId;
+        success = await updateRecordInCloud(editId, recordData);
+      } else {
+        finalMeds.forEach(m => m.isNew = true);
+        success = await addRecordToCloud(recordData);
+      }
+      if (success) {
+        showSaveFeedback('✅ 保存成功');
+        clearDraft();
+        modalOverlay.classList.remove('active');
+        renderTimeline();
+        renderMedHistory();
       }
     });
-    const daysEl = document.getElementById('countdownDays');
-    const dateEl = document.getElementById('nextVisitDate');
-    const reminderEl = document.getElementById('referralReminderInline');
-    if (nearest) {
-      const diff = Math.ceil((new Date(nearest)-today)/(1000*60*60*24));
-      daysEl.textContent = diff;
-      dateEl.textContent = '📅 '+nearest;
-      if (diff <= 7 && diff >= 0) {
-        reminderEl.style.display = 'inline';
+
+    // ================================================================
+    // 17. 其他功能
+    // ================================================================
+    document.getElementById('clearAllBtn').addEventListener('click', async ()=>{
+      if (!currentUser) { alert('请先登录'); return; }
+      if (confirm('确定要删除所有就诊记录吗？此操作不可恢复！')) {
+        for (let r of allRecords) {
+          await deleteRecordFromCloud(r.id);
+        }
+        renderTimeline();
+      }
+    });
+
+    document.getElementById('resetAllBtn').addEventListener('click', function() {
+      if (confirm('确定要清空所有健康档案数据吗？此操作不可恢复！')) {
+        localStorage.clear();
+        location.reload();
+      }
+    });
+
+    document.getElementById('searchInput').addEventListener('input', renderTimeline);
+
+    document.getElementById('privacyToggle').addEventListener('change', function(){
+      savePrivacy(this.checked);
+      applyPrivacy();
+      renderTimeline();
+    });
+
+    function applyPrivacy() {
+      const on = loadPrivacy();
+      document.getElementById('appContainer').classList.toggle('privacy-hidden', on);
+      document.getElementById('viewerOverlay').classList.toggle('privacy-on', on);
+    }
+
+    // 导出报告
+    document.getElementById('exportReportBtn').addEventListener('click', function(){
+      if (allRecords.length === 0) { alert('没有记录可导出'); return; }
+      const sorted = [...allRecords].sort((a,b)=>a.date<b.date?1:-1);
+      let html = '<div style="font-family:Segoe UI,sans-serif; padding:0.5rem;">';
+      html += `<h3 style="border-bottom:2px solid #1f4a6e; padding-bottom:0.5rem;">📋 健康档案报告</h3><p>共 ${allRecords.length} 条记录</p>`;
+      sorted.forEach(r => {
+        const total = (r.costRegistration||0)+(r.costExam||0)+(r.costDrug||0)+(r.costTransport||0);
+        html += `<div style="border:1px solid #e0eaf3; border-radius:20px; padding:1rem; margin:1rem 0; background:#fafdff;">`;
+        html += `<div><strong>${r.date||''}</strong> · ${r.hospital||''} · ${r.doctor||''}</div>`;
+        html += `<div style="font-size:0.9rem; color:#2d577a;">检查目的: ${r.purpose||''}</div>`;
+        if(r.symptomReason) html += `<div style="font-size:0.9rem;">症状: ${r.symptomReason}</div>`;
+        if(r.medications && r.medications.length) {
+          html += `<div style="font-size:0.9rem;">用药: ${r.medications.map(m => {
+            let label = `${m.name||''}${m.spec?' · '+m.spec:''}${m.usage?' · '+m.usage:''}`;
+            if(m.selfSupplied) label += ' · 自备';
+            if(m.longTerm) label += ' · 长期';
+            label += ` (${m.status||'服用中'})`;
+            return label;
+          }).join('; ')}</div>`;
+        }
+        if(r.feelings) html += `<div style="font-size:0.9rem;">感想: ${r.feelings}</div>`;
+        if(r.nextVisit) html += `<div style="font-size:0.9rem;">下次复查: ${r.nextVisit}</div>`;
+        if(r.scheduleDays && r.scheduleDays.length>0) {
+          html += `<div style="font-size:0.9rem;">出诊时间: ${r.scheduleDays.join('、')} ${r.schedulePeriod||''}</div>`;
+        }
+        if(total>0) {
+          html += `<div style="font-size:0.9rem;">💰 费用: 挂号费 ${(r.costRegistration||0).toFixed(2)}元, 检查费 ${(r.costExam||0).toFixed(2)}元, 药费 ${(r.costDrug||0).toFixed(2)}元, 交通费 ${(r.costTransport||0).toFixed(2)}元, 合计 ${total.toFixed(2)}元</div>`;
+        }
+        if(r.images && r.images.length>0) {
+          const imgs = r.images.filter(img => !img.startsWith('PDF:'));
+          const pdfs = r.images.filter(img => img.startsWith('PDF:'));
+          if (imgs.length>0) {
+            const show = imgs.slice(0,3);
+            const rest = imgs.length - 3;
+            html += `<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">`;
+            show.forEach(img => {
+              html += `<img src="${img}" style="width:60px;height:60px;object-fit:cover;border-radius:12px;border:1px solid #d6e3f0;">`;
+            });
+            if(rest>0) html += `<span style="display:inline-flex;align-items:center;font-size:0.8rem;color:#5a7f9e;">+${rest}张</span>`;
+            html += `</div>`;
+          }
+          if (pdfs.length>0) {
+            html += `<div style="font-size:0.8rem;color:#5a7f9e;margin-top:4px;">📄 PDF文件 ${pdfs.length} 个</div>`;
+          }
+        }
+        html += `</div>`;
+      });
+      html += '</div>';
+      document.getElementById('reportContent').innerHTML = html;
+      document.getElementById('reportModalOverlay').classList.add('active');
+    });
+
+    document.getElementById('closeReportBtn').addEventListener('click', ()=>document.getElementById('reportModalOverlay').classList.remove('active'));
+    document.getElementById('printReportBtn').addEventListener('click', function(){
+      const content=document.getElementById('reportContent').innerHTML;
+      const win=window.open('', '_blank');
+      win.document.write(`<html><head><title>健康报告</title><style>body{font-family:Segoe UI,sans-serif;padding:2rem;}img{max-width:100px;}</style></head><body>${content}<script>window.onload=function(){ window.print(); }<\/script></body></html>`);
+      win.document.close();
+    });
+    document.getElementById('reportModalOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('reportModalOverlay')) document.getElementById('reportModalOverlay').classList.remove('active'); });
+
+    // 数据导入/导出
+    document.getElementById('exportDataBtn').addEventListener('click', function() {
+      const data = {
+        records: allRecords,
+        metrics: allMetrics,
+        checkin: getCheckinData(),
+        baseHeight: getBaseHeight(),
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `health_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('importDataBtn').addEventListener('click', ()=>document.getElementById('importFileInput').click());
+    document.getElementById('importFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(ev) {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.records && currentUser) {
+            for (let r of data.records) {
+              delete r.id;
+              await addRecordToCloud(r);
+            }
+          }
+          if (data.metrics && currentUser) {
+            for (let m of data.metrics) {
+              delete m.id;
+              await addMetricToCloud(m);
+            }
+          }
+          if (data.checkin) saveCheckinData(data.checkin);
+          if (data.baseHeight) setBaseHeight(data.baseHeight);
+          alert('数据导入成功！');
+          location.reload();
+        } catch(err) { alert('导入失败，请检查文件格式是否正确。'); }
+      };
+      reader.readAsText(file);
+      this.value = '';
+    });
+
+    document.getElementById('metricsToggle').addEventListener('click', function(){
+      const panel=document.getElementById('metricsPanel');
+      panel.classList.toggle('open');
+      this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
+    });
+
+    function updateCountdown() {
+      let nearest = null;
+      const today = new Date(); today.setHours(0,0,0,0);
+      allRecords.forEach(r => {
+        if(r.nextVisit) {
+          const d = new Date(r.nextVisit); d.setHours(0,0,0,0);
+          if(d >= today && (!nearest || d < new Date(nearest))) nearest = r.nextVisit;
+        }
+      });
+      const daysEl = document.getElementById('countdownDays');
+      const dateEl = document.getElementById('nextVisitDate');
+      const reminderEl = document.getElementById('referralReminderInline');
+      if (nearest) {
+        const diff = Math.ceil((new Date(nearest)-today)/(1000*60*60*24));
+        daysEl.textContent = diff;
+        dateEl.textContent = '📅 '+nearest;
+        if (diff <= 7 && diff >= 0) {
+          reminderEl.style.display = 'inline';
+        } else {
+          reminderEl.style.display = 'none';
+        }
       } else {
+        daysEl.textContent = '--';
+        dateEl.textContent = '暂无复查计划';
         reminderEl.style.display = 'none';
       }
-    } else {
-      daysEl.textContent = '--';
-      dateEl.textContent = '暂无复查计划';
-      reminderEl.style.display = 'none';
     }
+
+    // ================================================================
+    // 18. 初始化
+    // ================================================================
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    checkSession();
+    setupCheckinEvents();
+    setupAutoSave();
+    ['costRegistration','costExam','costDrug','costTransport'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateCostTotal);
+    });
+    setInterval(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session && currentUser) checkSession();
+      });
+    }, 60000);
   }
 
   // ================================================================
-  // 16. 初始化
+  // 等待 SDK 加载完成
   // ================================================================
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  checkSession();
-  setupCheckinEvents();
-  setupAutoSave();
-  ['costRegistration','costExam','costDrug','costTransport'].forEach(id => {
-    document.getElementById(id).addEventListener('input', updateCostTotal);
-  });
-  setInterval(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session && currentUser) checkSession();
-    });
-  }, 60000);
+  waitForSupabase(startApp);
 </script>
 </body>
 </html>
