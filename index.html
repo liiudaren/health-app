@@ -712,28 +712,36 @@
     // 数据加载
     // ================================================================
     async function loadAllData() {
-      if (!currentUser) return;
-      const { data: recs, error: recErr } = await supabase
-        .from('records')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('date', { ascending: false });
-      if (recErr) console.error('加载记录失败:', recErr);
-      else allRecords = recs || [];
+  if (!currentUser) return;
+  const { data: recs, error: recErr } = await supabase
+    .from('records')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('date', { ascending: false });
+  if (recErr) console.error('加载记录失败:', recErr);
+  else {
+    // 解析 JSONB 字段
+    allRecords = (recs || []).map(r => ({
+      ...r,
+      schedule_days: r.schedule_days ? JSON.parse(r.schedule_days) : [],
+      medications: r.medications ? JSON.parse(r.medications) : [],
+      images: r.images ? JSON.parse(r.images) : []
+    }));
+  }
 
-      const { data: metricsData, error: metErr } = await supabase
-        .from('metrics')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('date', { ascending: false });
-      if (metErr) console.error('加载指标失败:', metErr);
-      else allMetrics = metricsData || [];
+  const { data: metricsData, error: metErr } = await supabase
+    .from('metrics')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('date', { ascending: false });
+  if (metErr) console.error('加载指标失败:', metErr);
+  else allMetrics = metricsData || [];
 
-      renderTimeline();
-      renderMetrics();
-      updateCountdown();
-      updateCheckinUI();
-    }
+  renderTimeline();
+  renderMetrics();
+  updateCountdown();
+  updateCheckinUI();
+}
 
     // ================================================================
     // Records CRUD
