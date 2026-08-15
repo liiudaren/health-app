@@ -756,59 +756,49 @@
     // Records CRUD
     // ================================================================
     async function addRecordToCloud(recordData) {
-      if (!currentUser) return false;
-      recordData.user_id = currentUser.id;
-      if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
-      if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
-      if (recordData.images) recordData.images = JSON.stringify(recordData.images);
+  if (!currentUser) return false;
+  recordData.user_id = currentUser.id;
+  if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
+  if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
+  if (recordData.images) recordData.images = JSON.stringify(recordData.images);
 
-      const { data, error } = await supabase
-        .from('records')
-        .insert([recordData])
-        .select();
-      if (error) {
-        console.error('新增失败:', error);
-        alert('保存失败：' + error.message);
-        return false;
-      }
-      if (data && data.length > 0) {
-        allRecords = [data[0], ...allRecords.filter(r => r.id !== data[0].id)];
-      } else {
-        // 如果没返回数据，重新加载
-        await loadAllData();
-        return true;
-      }
-      renderTimeline();
-      return true;
-    }
+  const { data, error } = await supabase
+    .from('records')
+    .insert([recordData])
+    .select();
+  if (error) {
+    console.error('新增失败:', error);
+    alert('保存失败：' + error.message);
+    return false;
+  }
+  // ✅ 关键改动：保存成功后重新加载所有数据
+  await loadAllData();
+  renderTimeline();
+  return true;
+}
 
     async function updateRecordInCloud(id, updates) {
-      if (!currentUser) return false;
-      if (updates.medications) updates.medications = JSON.stringify(updates.medications);
-      if (updates.schedule_days) updates.schedule_days = JSON.stringify(updates.schedule_days);
-      if (updates.images) updates.images = JSON.stringify(updates.images);
+  if (!currentUser) return false;
+  if (updates.medications) updates.medications = JSON.stringify(updates.medications);
+  if (updates.schedule_days) updates.schedule_days = JSON.stringify(updates.schedule_days);
+  if (updates.images) updates.images = JSON.stringify(updates.images);
 
-      const { data, error } = await supabase
-        .from('records')
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', currentUser.id)
-        .select();
-      if (error) {
-        console.error('更新失败:', error);
-        alert('更新失败：' + error.message);
-        return false;
-      }
-      if (data && data.length > 0) {
-        const idx = allRecords.findIndex(r => r.id === id);
-        if (idx !== -1) allRecords[idx] = data[0];
-      } else {
-        await loadAllData();
-        return true;
-      }
-      renderTimeline();
-      return true;
-    }
+  const { data, error } = await supabase
+    .from('records')
+    .update(updates)
+    .eq('id', id)
+    .eq('user_id', currentUser.id)
+    .select();
+  if (error) {
+    console.error('更新失败:', error);
+    alert('更新失败：' + error.message);
+    return false;
+  }
+  // ✅ 关键改动：更新成功后重新加载所有数据
+  await loadAllData();
+  renderTimeline();
+  return true;
+}
 
     async function deleteRecordFromCloud(id) {
       if (!currentUser) return false;
