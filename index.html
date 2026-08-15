@@ -6,10 +6,8 @@
   <title>🌱 个人健康档案 · 云端版</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <!-- 首先尝试常规加载 Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    /* ===== 完全保留你的原始样式，只增加登录相关样式 ===== */
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: #f8faff;
@@ -272,7 +270,6 @@
       .schedule-checkboxes { gap:2px 8px; }
     }
 
-    /* 新增登录样式 */
     .auth-btn {
       background: transparent;
       border: 1px solid #c3d6e9;
@@ -315,7 +312,6 @@
     </div>
   </div>
 
-  <!-- 登录模态框 -->
   <div class="modal-overlay" id="authModal">
     <div class="modal-card" style="max-width:420px;">
       <h2 id="authModalTitle"><i class="fas fa-lock"></i> 登录</h2>
@@ -337,7 +333,6 @@
     </div>
   </div>
 
-  <!-- 原有所有HTML结构 -->
   <div class="subhead">
     <span><i class="far fa-calendar-alt"></i> 记录你的每一刻</span>
     <span class="subhead-right">
@@ -573,14 +568,11 @@
 
 <script>
   // ================================================================
-  // 1. Supabase 配置（已填入你的项目信息）
+  // 1. Supabase 配置（你的 URL 和密钥已确认正确）
   // ================================================================
   const SUPABASE_URL = 'https://nveukkhvccpgjibbzbfr.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_i4fNz1islrenC3EQ5aOIJA_VMCcZYma';
 
-  // ================================================================
-  // 2. 等待 Supabase SDK 加载完成再启动
-  // ================================================================
   function waitForSupabase(callback, retries) {
     if (typeof window.supabase !== 'undefined') {
       callback();
@@ -596,18 +588,10 @@
     }, 300);
   }
 
-  // ================================================================
-  // 3. 启动应用
-  // ================================================================
   function startApp() {
-    // 创建 Supabase 客户端实例（全局）
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    // 挂载到 window 方便调试
     window.__supabase = supabase;
 
-    // ================================================================
-    // 4. 全局状态
-    // ================================================================
     let currentUser = null;
     let allRecords = [];
     let allMetrics = [];
@@ -615,9 +599,6 @@
     let existingImages = [];
     let pendingPDFs = [];
 
-    // ================================================================
-    // 5. 辅助函数
-    // ================================================================
     const PRIVACY_KEY = 'privacyMode_v1';
     const BASE_HEIGHT_KEY = 'baseHeight_v1';
     const DRAFT_KEY = 'recordDraft_v1';
@@ -640,7 +621,7 @@
     }
 
     // ================================================================
-    // 6. 认证相关
+    // 认证
     // ================================================================
     const authModal = document.getElementById('authModal');
     const authForm = document.getElementById('authForm');
@@ -728,11 +709,10 @@
     });
 
     // ================================================================
-    // 7. 数据加载（从 Supabase）
+    // 数据加载
     // ================================================================
     async function loadAllData() {
       if (!currentUser) return;
-      // 加载就诊记录
       const { data: recs, error: recErr } = await supabase
         .from('records')
         .select('*')
@@ -741,7 +721,6 @@
       if (recErr) console.error('加载记录失败:', recErr);
       else allRecords = recs || [];
 
-      // 加载指标
       const { data: metricsData, error: metErr } = await supabase
         .from('metrics')
         .select('*')
@@ -757,11 +736,12 @@
     }
 
     // ================================================================
-    // 8. Records CRUD
+    // Records CRUD（字段名已全部改成数据库对应的下划线格式）
     // ================================================================
     async function addRecordToCloud(recordData) {
       if (!currentUser) return false;
       recordData.user_id = currentUser.id;
+      // 注意：这些字段在数据库中都是下划线格式
       if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
       if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
       if (recordData.images) recordData.images = JSON.stringify(recordData.images);
@@ -820,7 +800,7 @@
     }
 
     // ================================================================
-    // 9. Metrics CRUD
+    // Metrics CRUD
     // ================================================================
     async function addMetricToCloud(metric) {
       if (!currentUser) return false;
@@ -856,7 +836,7 @@
     }
 
     // ================================================================
-    // 10. 渲染函数（Timeline）
+    // 渲染函数
     // ================================================================
     function renderTimeline() {
       const container = document.getElementById('timelineContainer');
@@ -909,17 +889,17 @@
         const medDisplayHtml = buildMedicationDisplay(currMeds);
 
         let symptomHtml = '';
-        if(record.purpose==='针对性检查' && record.symptomReason) {
-          symptomHtml = `<div style="font-size:0.85rem; color:#3e6b8a; margin-top:2px;"><i class="fas fa-stethoscope"></i> ${record.symptomReason}</div>`;
+        if(record.purpose==='针对性检查' && record.symptom_reason) {
+          symptomHtml = `<div style="font-size:0.85rem; color:#3e6b8a; margin-top:2px;"><i class="fas fa-stethoscope"></i> ${record.symptom_reason}</div>`;
         }
 
         const imgCount = (record.images||[]).length;
         const viewBtn = imgCount>0 ? `<button class="btn-sm view-images-btn" data-id="${record.id}"><i class="fas fa-images"></i> 查看图片 (${imgCount})</button>` : `<span style="color:#b0c8dd;font-size:0.8rem;"><i class="far fa-image"></i> 无图片</span>`;
 
         let metricHtml = '';
-        if(record.metricValue) metricHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-chart-line"></i> 指标: ${record.metricValue}</div>`;
+        if(record.metric_value) metricHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-chart-line"></i> 指标: ${record.metric_value}</div>`;
         let weightHtml = '';
-        if(record.recordWeight) weightHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-weight"></i> 体重: ${record.recordWeight} kg</div>`;
+        if(record.record_weight) weightHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-weight"></i> 体重: ${record.record_weight} kg</div>`;
 
         let intervalText = '';
         const prevRec = getPrevRecord(allRecords, record.id);
@@ -933,11 +913,11 @@
         }
 
         let scheduleHtml = '';
-        if (record.scheduleDays && record.scheduleDays.length>0) {
-          const daysStr = record.scheduleDays.join('、');
-          const period = record.schedulePeriod || '上午';
+        if (record.schedule_days && record.schedule_days.length>0) {
+          const daysStr = record.schedule_days.join('、');
+          const period = record.schedule_period || '上午';
           scheduleHtml = `<div style="font-size:0.8rem; color:#2d6b8f;"><i class="far fa-clock"></i> 出诊时间：${daysStr} ${period}</div>`;
-          if (record.nextVisit) {
+          if (record.next_visit) {
             const match = checkScheduleMatch(record);
             if (match) {
               scheduleHtml += `<div style="font-size:0.8rem; color:${match.includes('✅')?'#1f8b5a':'#b45f1a'};">${match}</div>`;
@@ -961,7 +941,7 @@
                 ${medDisplayHtml}
                 ${metricHtml}${weightHtml}
                 ${record.feelings ? `<div style="font-size:0.85rem;color:#456f8f;margin-top:4px;"><i class="fas fa-quote-left" style="opacity:0.5;"></i> ${record.feelings.substring(0,60)}${record.feelings.length>60?'…':''}</div>` : ''}
-                ${record.nextVisit ? `<div style="font-size:0.8rem;color:#2d6b8f;margin-top:2px;"><i class="far fa-calendar-check"></i> 下次复查: ${record.nextVisit}</div>` : ''}
+                ${record.next_visit ? `<div style="font-size:0.8rem;color:#2d6b8f;margin-top:2px;"><i class="far fa-calendar-check"></i> 下次复查: ${record.next_visit}</div>` : ''}
                 ${scheduleHtml}
               </div>
               <div class="card-actions">
@@ -993,7 +973,6 @@
       }));
     }
 
-    // 辅助函数
     function getPrevRecord(records, id) {
       const sorted=[...records].sort((a,b)=> new Date(b.date) - new Date(a.date));
       const idx=sorted.findIndex(r=>r.id===id);
@@ -1001,9 +980,9 @@
       return sorted[idx+1];
     }
     function checkScheduleMatch(record) {
-      if (!record.nextVisit || !record.scheduleDays || record.scheduleDays.length===0) return null;
-      const wd = getWeekday(record.nextVisit);
-      if (record.scheduleDays.includes(wd)) return '✅ 该日期符合医生出诊时间';
+      if (!record.next_visit || !record.schedule_days || record.schedule_days.length===0) return null;
+      const wd = getWeekday(record.next_visit);
+      if (record.schedule_days.includes(wd)) return '✅ 该日期符合医生出诊时间';
       return '⚠️ 该日期可能不是医生出诊时间，请确认';
     }
     function getWeekday(dateStr) {
@@ -1056,7 +1035,7 @@
     }
 
     // ================================================================
-    // 11. 打卡
+    // 打卡
     // ================================================================
     function getCheckinData() {
       try { return JSON.parse(localStorage.getItem('checkinData_v2')) || { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; } 
@@ -1150,7 +1129,7 @@
     }
 
     // ================================================================
-    // 12. 身体指标
+    // 身体指标
     // ================================================================
     function renderMetrics() {
       const tbody = document.getElementById('metricsBody');
@@ -1237,7 +1216,7 @@
     });
 
     // ================================================================
-    // 13. 用药历史
+    // 用药历史
     // ================================================================
     function renderMedHistory() {
       if (allRecords.length === 0) {
@@ -1276,7 +1255,7 @@
     });
 
     // ================================================================
-    // 14. 图片查看器
+    // 图片查看器
     // ================================================================
     let viewerImages=[], viewerIdx=0, viewerScale=1, viewerRot=0;
     function openViewer(id) {
@@ -1312,7 +1291,7 @@
     });
 
     // ================================================================
-    // 15. 就诊记录弹窗
+    // 就诊记录弹窗
     // ================================================================
     const modalOverlay = document.getElementById('modalOverlay');
     const openModalBtn = document.getElementById('openModalBtn');
@@ -1523,20 +1502,20 @@
       document.getElementById('hospitalName').value = r.hospital || '';
       document.getElementById('doctorName').value = r.doctor || '';
       document.getElementById('examPurpose').value = r.purpose || '常规复查';
-      if (r.scheduleDays && r.scheduleDays.length > 0) {
+      if (r.schedule_days && r.schedule_days.length > 0) {
         document.querySelectorAll('#scheduleCheckboxes input[type="checkbox"]').forEach(cb => {
-          cb.checked = r.scheduleDays.includes(cb.value);
+          cb.checked = r.schedule_days.includes(cb.value);
         });
       }
-      document.getElementById('schedulePeriod').value = r.schedulePeriod || '上午';
+      document.getElementById('schedulePeriod').value = r.schedule_period || '上午';
       if (r.purpose === '针对性检查') {
         document.getElementById('symptomGroup').classList.add('visible');
       }
-      document.getElementById('symptomReason').value = r.symptomReason || '';
+      document.getElementById('symptomReason').value = r.symptom_reason || '';
       document.getElementById('feelings').value = r.feelings || '';
-      document.getElementById('nextVisitDateInput').value = r.nextVisit || '';
-      document.getElementById('metricValue').value = r.metricValue || '';
-      document.getElementById('recordWeight').value = r.recordWeight || '';
+      document.getElementById('nextVisitDateInput').value = r.next_visit || '';
+      document.getElementById('metricValue').value = r.metric_value || '';
+      document.getElementById('recordWeight').value = r.record_weight || '';
       document.getElementById('costRegistration').value = r.costRegistration || 0;
       document.getElementById('costExam').value = r.costExam || 0;
       document.getElementById('costDrug').value = r.costDrug || 0;
@@ -1803,7 +1782,6 @@
     });
     fileInput.addEventListener('change', async e=>{ if(e.target.files.length){ await handleFiles(e.target.files); fileInput.value=''; } });
 
-    // PDF渲染
     async function renderPDFToImage(pdfData, pageNum = 1) {
       try {
         const loadingTask = pdfjsLib.getDocument({ data: pdfData });
@@ -1859,7 +1837,7 @@
     }
 
     // ================================================================
-    // 16. 保存就诊记录
+    // 保存就诊记录（关键：字段名全部改为数据库列名）
     // ================================================================
     recordForm.addEventListener('submit', async (e)=>{
       e.preventDefault();
@@ -1908,20 +1886,27 @@
 
       const finalMeds = medications.map(m => ({ ...m, isNew: false }));
 
+      // ！！！
+      // 关键：这里的所有字段名必须和数据库列名完全一致
+      // 数据库列名是下划线格式：next_visit, metric_value, record_weight, schedule_days, schedule_period, symptom_reason
+      // ！！！
       const recordData = {
-        date, hospital, doctor, purpose,
-        symptomReason: purpose==='针对性检查' ? symptomReason : '',
-        feelings,
-        nextVisit: nextVisit || '',
+        date: date,
+        hospital: hospital,
+        doctor: doctor,
+        purpose: purpose,
+        symptom_reason: purpose === '针对性检查' ? symptomReason : '',
+        feelings: feelings,
+        next_visit: nextVisit || '',
         medications: finalMeds,
-        metricValue,
-        recordWeight,
-        scheduleDays,
-        schedulePeriod,
-        costRegistration,
-        costExam,
-        costDrug,
-        costTransport,
+        metric_value: metricValue,
+        record_weight: recordWeight,
+        schedule_days: scheduleDays,
+        schedule_period: schedulePeriod,
+        costRegistration: costRegistration,
+        costExam: costExam,
+        costDrug: costDrug,
+        costTransport: costTransport,
         images: compressed,
       };
 
@@ -1950,7 +1935,7 @@
     });
 
     // ================================================================
-    // 17. 其他功能
+    // 其他功能
     // ================================================================
     document.getElementById('clearAllBtn').addEventListener('click', async ()=>{
       if (!currentUser) { alert('请先登录'); return; }
@@ -1983,7 +1968,6 @@
       document.getElementById('viewerOverlay').classList.toggle('privacy-on', on);
     }
 
-    // 导出报告
     document.getElementById('exportReportBtn').addEventListener('click', function(){
       if (allRecords.length === 0) { alert('没有记录可导出'); return; }
       const sorted = [...allRecords].sort((a,b)=>a.date<b.date?1:-1);
@@ -1994,7 +1978,7 @@
         html += `<div style="border:1px solid #e0eaf3; border-radius:20px; padding:1rem; margin:1rem 0; background:#fafdff;">`;
         html += `<div><strong>${r.date||''}</strong> · ${r.hospital||''} · ${r.doctor||''}</div>`;
         html += `<div style="font-size:0.9rem; color:#2d577a;">检查目的: ${r.purpose||''}</div>`;
-        if(r.symptomReason) html += `<div style="font-size:0.9rem;">症状: ${r.symptomReason}</div>`;
+        if(r.symptom_reason) html += `<div style="font-size:0.9rem;">症状: ${r.symptom_reason}</div>`;
         if(r.medications && r.medications.length) {
           html += `<div style="font-size:0.9rem;">用药: ${r.medications.map(m => {
             let label = `${m.name||''}${m.spec?' · '+m.spec:''}${m.usage?' · '+m.usage:''}`;
@@ -2005,9 +1989,9 @@
           }).join('; ')}</div>`;
         }
         if(r.feelings) html += `<div style="font-size:0.9rem;">感想: ${r.feelings}</div>`;
-        if(r.nextVisit) html += `<div style="font-size:0.9rem;">下次复查: ${r.nextVisit}</div>`;
-        if(r.scheduleDays && r.scheduleDays.length>0) {
-          html += `<div style="font-size:0.9rem;">出诊时间: ${r.scheduleDays.join('、')} ${r.schedulePeriod||''}</div>`;
+        if(r.next_visit) html += `<div style="font-size:0.9rem;">下次复查: ${r.next_visit}</div>`;
+        if(r.schedule_days && r.schedule_days.length>0) {
+          html += `<div style="font-size:0.9rem;">出诊时间: ${r.schedule_days.join('、')} ${r.schedule_period||''}</div>`;
         }
         if(total>0) {
           html += `<div style="font-size:0.9rem;">💰 费用: 挂号费 ${(r.costRegistration||0).toFixed(2)}元, 检查费 ${(r.costExam||0).toFixed(2)}元, 药费 ${(r.costDrug||0).toFixed(2)}元, 交通费 ${(r.costTransport||0).toFixed(2)}元, 合计 ${total.toFixed(2)}元</div>`;
@@ -2045,7 +2029,6 @@
     });
     document.getElementById('reportModalOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('reportModalOverlay')) document.getElementById('reportModalOverlay').classList.remove('active'); });
 
-    // 数据导入/导出
     document.getElementById('exportDataBtn').addEventListener('click', function() {
       const data = {
         records: allRecords,
@@ -2103,9 +2086,9 @@
       let nearest = null;
       const today = new Date(); today.setHours(0,0,0,0);
       allRecords.forEach(r => {
-        if(r.nextVisit) {
-          const d = new Date(r.nextVisit); d.setHours(0,0,0,0);
-          if(d >= today && (!nearest || d < new Date(nearest))) nearest = r.nextVisit;
+        if(r.next_visit) {
+          const d = new Date(r.next_visit); d.setHours(0,0,0,0);
+          if(d >= today && (!nearest || d < new Date(nearest))) nearest = r.next_visit;
         }
       });
       const daysEl = document.getElementById('countdownDays');
@@ -2128,7 +2111,7 @@
     }
 
     // ================================================================
-    // 18. 初始化
+    // 初始化
     // ================================================================
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     checkSession();
@@ -2144,9 +2127,6 @@
     }, 60000);
   }
 
-  // ================================================================
-  // 等待 SDK 加载完成
-  // ================================================================
   waitForSupabase(startApp);
 </script>
 </body>
