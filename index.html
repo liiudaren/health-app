@@ -8,7 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ===== 全部样式 ===== */
+    /* ===== 全部样式（与你原始文件完全一致，只增补了登录按钮样式） ===== */
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: #f8faff;
@@ -271,7 +271,7 @@
       .schedule-checkboxes { gap:2px 8px; }
     }
 
-    /* 新增登录相关样式 */
+    /* 新增登录样式 */
     .auth-btn {
       background: transparent;
       border: 1px solid #c3d6e9;
@@ -336,7 +336,7 @@
     </div>
   </div>
 
-  <!-- 以下所有HTML结构完全保留自您的原始文件，未做任何改动 -->
+  <!-- 原有所有HTML结构 -->
   <div class="subhead">
     <span><i class="far fa-calendar-alt"></i> 记录你的每一刻</span>
     <span class="subhead-right">
@@ -576,6 +576,7 @@
   // ================================================================
   const SUPABASE_URL = 'https://nveukkhvccpgjibzbzfr.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_i4fNz1islrenC3EQ5aOIJA_VMCcZYma';
+  // 声明 supabase 实例（只声明一次）
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ================================================================
@@ -584,21 +585,17 @@
   let currentUser = null;
   let allRecords = [];
   let allMetrics = [];
-  let checkinData = null;
-  let baseHeight = null;
   let selectedFiles = [];
   let existingImages = [];
   let pendingPDFs = [];
 
-  // 存储键（用于隐私、草稿等仍保留 localStorage）
+  // ================================================================
+  // 3. 辅助函数（与原来完全一致）
+  // ================================================================
   const PRIVACY_KEY = 'privacyMode_v1';
   const BASE_HEIGHT_KEY = 'baseHeight_v1';
   const DRAFT_KEY = 'recordDraft_v1';
-  const METRICS_KEY = 'bodyMetrics_v2';  // 降级使用
 
-  // ================================================================
-  // 3. 辅助函数
-  // ================================================================
   function loadPrivacy() { return localStorage.getItem(PRIVACY_KEY) === 'true'; }
   function savePrivacy(v) { localStorage.setItem(PRIVACY_KEY, String(v)); }
   function getBaseHeight() { return parseFloat(localStorage.getItem(BASE_HEIGHT_KEY)) || null; }
@@ -606,6 +603,7 @@
   function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || null; } catch(e){ return null; } }
   function saveDraft(d) { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }
   function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
+
   function showSaveFeedback(msg, isSuccess = true) {
     const el = document.getElementById('saveFeedback');
     el.textContent = msg;
@@ -648,7 +646,7 @@
       allMetrics = [];
       document.getElementById('timelineContainer').innerHTML = '<div class="empty-message">请先登录以查看您的健康档案</div>';
       document.getElementById('recordCount').textContent = '0 条记录';
-      renderMetrics(); // 清空指标
+      renderMetrics();
     }
   }
 
@@ -702,7 +700,7 @@
   });
 
   // ================================================================
-  // 5. 数据加载（从 Supabase）
+  // 5. 数据加载
   // ================================================================
   async function loadAllData() {
     if (!currentUser) return;
@@ -715,7 +713,7 @@
     if (recErr) console.error('加载记录失败:', recErr);
     else allRecords = recs || [];
 
-    // 加载指标（单独表 metrics）
+    // 加载指标
     const { data: metricsData, error: metErr } = await supabase
       .from('metrics')
       .select('*')
@@ -724,14 +722,6 @@
     if (metErr) console.error('加载指标失败:', metErr);
     else allMetrics = metricsData || [];
 
-    // 加载打卡数据（单独表 checkin）
-    // 这里简化：打卡仍使用 localStorage，因为打卡是当日状态，且之前未要求同步。若要同步，可类似实现。
-    // 但为了真正多设备同步，我们也将打卡存入云端。
-    // 创建表 checkin (id, user_id, date, morning_checked, morning_time, afternoon_checked, afternoon_time, evening_checked, evening_time)
-    // 由于涉及表结构改动，本次先保留 localStorage，后续可扩展。
-    // 我们使用 localStorage 降级。
-    // 但为了用户数据一致性，我们仍使用 localStorage 打卡。
-
     renderTimeline();
     renderMetrics();
     updateCountdown();
@@ -739,20 +729,11 @@
   }
 
   // ================================================================
-  // 6. 重写 Records 的 CRUD（替换原有 localStorage）
+  // 6. Records CRUD
   // ================================================================
-  // 将以下函数暴露到全局，以便原有事件绑定使用
-  window.loadRecords = function() { return allRecords; };
-  window.saveRecords = async function(records) {
-    // 此函数不再直接保存，而是通过具体增删改操作调用云函数
-    // 保留以便兼容，但实际不用
-  };
-
-  // 新增记录
   async function addRecordToCloud(recordData) {
     if (!currentUser) return false;
     recordData.user_id = currentUser.id;
-    // 转换 JSONB
     if (recordData.medications) recordData.medications = JSON.stringify(recordData.medications);
     if (recordData.schedule_days) recordData.schedule_days = JSON.stringify(recordData.schedule_days);
     if (recordData.images) recordData.images = JSON.stringify(recordData.images);
@@ -766,13 +747,11 @@
       alert('保存失败：' + error.message);
       return false;
     }
-    // 更新本地缓存
     allRecords = [data[0], ...allRecords];
     renderTimeline();
     return true;
   }
 
-  // 更新记录
   async function updateRecordInCloud(id, updates) {
     if (!currentUser) return false;
     if (updates.medications) updates.medications = JSON.stringify(updates.medications);
@@ -790,14 +769,12 @@
       alert('更新失败：' + error.message);
       return false;
     }
-    // 更新本地缓存
     const idx = allRecords.findIndex(r => r.id === id);
     if (idx !== -1) allRecords[idx] = data[0];
     renderTimeline();
     return true;
   }
 
-  // 删除记录
   async function deleteRecordFromCloud(id) {
     if (!currentUser) return false;
     const { error } = await supabase
@@ -815,7 +792,7 @@
   }
 
   // ================================================================
-  // 7. 重写 Metrics 的 CRUD（指标也存云端）
+  // 7. Metrics CRUD
   // ================================================================
   async function addMetricToCloud(metric) {
     if (!currentUser) return false;
@@ -851,7 +828,7 @@
   }
 
   // ================================================================
-  // 8. 渲染函数（Timeline）
+  // 8. 渲染函数（Timeline、Metrics、打卡等）
   // ================================================================
   function renderTimeline() {
     const container = document.getElementById('timelineContainer');
@@ -860,7 +837,6 @@
     const privacyOn = loadPrivacy();
     document.getElementById('viewerOverlay').classList.toggle('privacy-on', privacyOn);
 
-    // 打卡数据（仍从 localStorage 读取）
     const checkinData = getCheckinData();
     const hasAnyCheckin = checkinData.morning.checked || checkinData.afternoon.checked || checkinData.evening.checked;
     let checkinCardHtml = '';
@@ -917,7 +893,6 @@
       let weightHtml = '';
       if(record.recordWeight) weightHtml = `<div style="font-size:0.8rem; color:#2f6b8a; margin-top:2px;"><i class="fas fa-weight"></i> 体重: ${record.recordWeight} kg</div>`;
 
-      // 计算间隔
       let intervalText = '';
       const prevRec = getPrevRecord(allRecords, record.id);
       if (prevRec) {
@@ -981,7 +956,6 @@
     updateCheckinUI();
     applyPrivacy();
 
-    // 绑定事件
     document.querySelectorAll('.view-images-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openViewer(this.dataset.id); }));
     document.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); openEditModal(this.dataset.id); }));
     document.querySelectorAll('.delete-btn').forEach(b=>b.addEventListener('click', function(e){ e.stopPropagation(); 
@@ -998,20 +972,17 @@
     if(idx===-1 || idx===sorted.length-1) return null;
     return sorted[idx+1];
   }
-
   function checkScheduleMatch(record) {
     if (!record.nextVisit || !record.scheduleDays || record.scheduleDays.length===0) return null;
     const wd = getWeekday(record.nextVisit);
     if (record.scheduleDays.includes(wd)) return '✅ 该日期符合医生出诊时间';
     return '⚠️ 该日期可能不是医生出诊时间，请确认';
   }
-
   function getWeekday(dateStr) {
     const d = new Date(dateStr);
     const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
     return weekdays[d.getDay()];
   }
-
   function buildMedicationDisplay(currMeds) {
     if (!currMeds || currMeds.length === 0) {
       return '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
@@ -1046,7 +1017,6 @@
     }
     return html || '<div style="font-size:0.8rem;color:#8aaac0;"><i class="fas fa-minus-circle"></i> 无用药记录</div>';
   }
-
   function formatMedShort(m) {
     let parts = [m.name || ''];
     if (m.spec) parts.push(m.spec);
@@ -1058,7 +1028,7 @@
   }
 
   // ================================================================
-  // 9. 打卡功能（沿用 localStorage，但为了保持一致性，可考虑云端，暂不扩展）
+  // 9. 打卡
   // ================================================================
   function getCheckinData() {
     try { return JSON.parse(localStorage.getItem('checkinData_v2')) || { date: '', morning: { checked: false, time: '' }, afternoon: { checked: false, time: '' }, evening: { checked: false, time: '' } }; } 
@@ -1098,7 +1068,6 @@
       }
     });
   }
-
   function setupCheckinEvents() {
     document.querySelectorAll('.checkin-checkbox').forEach(cb => {
       cb.addEventListener('change', function(e) {
@@ -1153,7 +1122,7 @@
   }
 
   // ================================================================
-  // 10. 身体指标（渲染、增删改）
+  // 10. 身体指标
   // ================================================================
   function renderMetrics() {
     const tbody = document.getElementById('metricsBody');
@@ -1315,7 +1284,7 @@
   });
 
   // ================================================================
-  // 13. 就诊记录弹窗逻辑（新增/编辑）
+  // 13. 就诊记录弹窗（新增/编辑）
   // ================================================================
   const modalOverlay = document.getElementById('modalOverlay');
   const openModalBtn = document.getElementById('openModalBtn');
@@ -1332,7 +1301,6 @@
     checkboxes.forEach(cb => { if (cb.checked) days.push(cb.value); });
     return days;
   }
-
   function getMedsData() {
     const rows = medicationGroup.querySelectorAll('.med-row');
     const list = [];
@@ -1386,7 +1354,6 @@
         alert('至少保留一种用药，可留空表示无用药。');
       }
     });
-    // 药名联想
     setupNameSuggestion(row.querySelector('.med-name'));
     row.querySelectorAll('input, select').forEach(inp => {
       inp.addEventListener('input', autoSaveDraft);
@@ -1403,7 +1370,6 @@
     });
   }
 
-  // 药名联想（从历史记录）
   function getHistoricalDrugNames() {
     const names = new Set();
     allRecords.forEach(r => {
@@ -1413,7 +1379,6 @@
     });
     return Array.from(names).sort();
   }
-
   function getDrugHistory(name) {
     const sorted = [...allRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
     for (let r of sorted) {
@@ -1427,7 +1392,6 @@
     }
     return null;
   }
-
   function setupNameSuggestion(input) {
     const wrapper = input.closest('.med-name-wrapper');
     const suggestions = wrapper.querySelector('.med-name-suggestions');
@@ -1456,7 +1420,6 @@
       }
     });
   }
-
   function autoFillDrugHistory(input) {
     const name = input.value.trim();
     if (!name) return;
@@ -1470,7 +1433,6 @@
     if (history.usage && !usageInput.value) usageInput.value = history.usage;
     if (history.longTerm) longTermCheck.checked = true;
   }
-
   function initAllNameSuggestions() {
     document.querySelectorAll('.med-name').forEach(inp => setupNameSuggestion(inp));
   }
@@ -1483,7 +1445,6 @@
     document.getElementById('costTotalDisplay').textContent = (reg + exam + drug + transport).toFixed(2);
   }
 
-  // 文件上传
   function renderPreview() {
     const container=document.getElementById('filePreviewContainer'); container.innerHTML='';
     existingImages.forEach((_,i)=>{ const div=document.createElement('div'); div.className='preview-item'; div.innerHTML=`<i class="fas fa-image"></i> 已有图片 ${i+1} <i class="fas fa-times-circle" data-existing="${i}"></i>`; container.appendChild(div); });
@@ -1608,7 +1569,6 @@
     clearDraft();
   }
 
-  // 草稿自动保存
   function autoSaveDraft() {
     const formData = {
       editId: editIdInput.value,
@@ -1849,7 +1809,6 @@
       return null;
     }
   }
-
   function compressImage(file) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -1872,7 +1831,7 @@
   }
 
   // ================================================================
-  // 14. 表单提交（新增/编辑记录）
+  // 14. 保存就诊记录
   // ================================================================
   recordForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -1897,7 +1856,6 @@
 
     if(!date||!hospital||!doctor){ alert('请填写日期、医院、医生'); return; }
 
-    // 处理图片
     let compressed = [...existingImages];
     for (let f of selectedFiles) {
       if (f.type === 'application/pdf') {
@@ -1941,7 +1899,6 @@
 
     let success = false;
     if (editId) {
-      // 编辑：标记新药
       const oldRecord = allRecords.find(r => r.id === editId);
       if (oldRecord) {
         const oldNames = new Set((oldRecord.medications || []).map(m => m.name));
@@ -1952,7 +1909,6 @@
       recordData.id = editId;
       success = await updateRecordInCloud(editId, recordData);
     } else {
-      // 新增
       finalMeds.forEach(m => m.isNew = true);
       success = await addRecordToCloud(recordData);
     }
@@ -1961,12 +1917,12 @@
       clearDraft();
       modalOverlay.classList.remove('active');
       renderTimeline();
-      renderMedHistory(); // 更新用药历史
+      renderMedHistory();
     }
   });
 
   // ================================================================
-  // 15. 其他功能（清除、重置、导出报告、隐私等）
+  // 15. 其他功能
   // ================================================================
   document.getElementById('clearAllBtn').addEventListener('click', async ()=>{
     if (!currentUser) { alert('请先登录'); return; }
@@ -2061,7 +2017,7 @@
   });
   document.getElementById('reportModalOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('reportModalOverlay')) document.getElementById('reportModalOverlay').classList.remove('active'); });
 
-  // 数据导入/导出（保留原有的JSON导入导出功能，但导入时需将数据存入云端）
+  // 数据导入/导出
   document.getElementById('exportDataBtn').addEventListener('click', function() {
     const data = {
       records: allRecords,
@@ -2089,7 +2045,7 @@
         const data = JSON.parse(ev.target.result);
         if (data.records && currentUser) {
           for (let r of data.records) {
-            delete r.id; // 让数据库生成新id
+            delete r.id;
             await addRecordToCloud(r);
           }
         }
@@ -2115,7 +2071,6 @@
     this.querySelector('i').style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0)';
   });
 
-  // 更新倒计时
   function updateCountdown() {
     let nearest = null;
     const today = new Date(); today.setHours(0,0,0,0);
@@ -2154,7 +2109,6 @@
   ['costRegistration','costExam','costDrug','costTransport'].forEach(id => {
     document.getElementById(id).addEventListener('input', updateCostTotal);
   });
-  // 每60秒检查会话
   setInterval(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session && currentUser) checkSession();
